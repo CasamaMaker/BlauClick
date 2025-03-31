@@ -146,3 +146,20 @@ input[type="submit"]:hover {
 form {
   padding: 20px;
 }
+
+#macList {
+  margin-top: 20px;
+  padding: 10px;
+}
+
+.mac-item {
+  background-color: #f0f0f0;
+  padding: 10px;
+  margin-bottom: 5px;
+  cursor: pointer;
+  border-radius: 5px;
+}
+
+.mac-item:hover {
+  background-color: #e0e0e0;
+}

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="X-UA-Compatible" content="ie=edge" />
-  <link rel="stylesheet" type="text/css" href="style.css" />
+  <link rel="stylesheet" type="text/css" href="/style.css" />
   <!--<script type="text/javascript" src="script.js"></script>-->
   <script>
     function formatMAC(input) {
@@ -21,11 +21,11 @@
         input.value = formattedValue;
     }
 
-    function fetchData() {
+    function fetchMac() {
       var xhttp = new XMLHttpRequest();
       xhttp.onreadystatechange = function() {
         if (this.readyState == 4 && this.status == 200) {
-          document.getElementById("mac").innerHTML =
+          document.getElementById("macSaved").innerHTML =
           this.responseText;
         }
       };
@@ -33,8 +33,50 @@
       xhttp.send();
     }
 
+    // function fetchMacList() {
+    //   var xhttp = new XMLHttpRequest();
+    //   xhttp.onreadystatechange = function() {
+    //     if (this.readyState == 4 && this.status == 200) {
+    //       document.getElementById("macList").innerHTML =
+    //       this.responseText;
+    //     }
+    //   };
+    //   xhttp.open("GET", "/macList", true);
+    //   xhttp.send();
+    // }
+
+        // Funció per obtenir la llista d'adreces MAC
+    function fetchMacList() {
+      var xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+          const macList = this.responseText.split("\n");
+          const macListContainer = document.getElementById("macList");
+          macListContainer.innerHTML = ''; // Neteja la llista abans d'omplir-la
+          
+          // Iterem sobre les adreces MAC i les afegim a la llista
+          macList.forEach(mac => {
+            const macDiv = document.createElement("div");
+            macDiv.classList.add("mac-item");
+            macDiv.innerText = mac.split(" >> ")[1];
+            macDiv.style.cursor = 'pointer';
+            macDiv.onclick = function() { setMac(mac); }; // Quan es fa clic, s'afegeix al camp d'entrada
+            macListContainer.appendChild(macDiv);
+          });
+        }
+      };
+      xhttp.open("GET", "/macList", true);
+      xhttp.send();
+    }
+
+    // Funció per establir la MAC seleccionada al camp d'entrada
+    function setMac(mac) {
+      document.getElementById("mac").value = mac.split(" >> ")[0]; // Col·loca la MAC seleccionada al camp d'entrada
+    }
+
     window.onload = function() {
-      fetchData(); // Crida fetchData quan es carrega la pàgina
+      fetchMac();     // Crida a fetchMac per obtenir la MAC actual
+      fetchMacList(); // Crida a fetchMacList per obtenir la llista d'adreces MAC
     }
 
   </script>
@@ -48,7 +90,7 @@
     <h2>Adreça MAC de l'esclau:</h2>
     <label for="ssid">Valor guardat:</label>
     <div id="macG" class="values">
-      <p><span id="mac"></span></p>
+      <p><span id="macSaved"></span></p>
     </div>
     <form action="/" method="POST">
       <label for="ssid">Adreça MAC de l'esclau:</label>
@@ -56,6 +98,8 @@
 
       <input type="submit" value="Submit" />
     </form>
+    <h3>Adreces MAC trobades:</h3>
+    <div id="macList"></div>  <!-- Aquí es mostrarà la llista d'adreces MAC -->
   </div>
 </body>
 </html>

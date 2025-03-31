@@ -6,7 +6,7 @@
 #include <ESPAsyncWebServer.h>
 #include <AsyncTCP.h>
 // #include "SPIFFS.h"
-#include <FS.h>
+// #include <FS.h>
 
 void initSPIFFS();
 String readFile(fs::FS &fs, const char * path);
