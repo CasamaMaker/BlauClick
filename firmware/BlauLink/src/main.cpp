@@ -10,7 +10,9 @@
 #include "ESPAsyncWebServer.h"
 #include "DNSServer.h"
 #include <wifimanager.h>
-#include "SPIFFS.h"
+// #include "SPIFFS.h"
+// #include "spiffs.h"
+#include <LittleFS.h>
 #include <esp_sleep.h>
 #include <EEPROM.h>
 #include <esp_now.h>
@@ -79,7 +81,7 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
 void webServerSetup(){
   // accedeix aquí just conectar-se a la wifi des de l'ordinador
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(SPIFFS, "/wifimanager.html", "text/html");
+    request->send(LittleFS, "/wifimanager.html", "text/html");
     Serial.println("myweb /");
   });
 
@@ -87,20 +89,20 @@ void webServerSetup(){
   //This is an example of triggering for a known location.  This one seems to be common for android devices
   server.on("/generate_204", HTTP_GET, [](AsyncWebServerRequest *request){
     //request->send(200, "text/plain", "You were sent here by a captive portal after requesting generate_204");
-    request->send(SPIFFS, "/wifimanager.html", "text/html");
+    request->send(LittleFS, "/wifimanager.html", "text/html");
     Serial.println("requested /generate_204");
   });
 
   // accedeix aquí quan busques qualsevol web al navegador
   //This is an example of a redirect type response.  onNotFound acts as a catch-all for any request not defined above
   server.onNotFound([](AsyncWebServerRequest *request){
-    request->send(SPIFFS, "/wifimanager.html", "text/html"); //request->redirect("/");
+    request->send(LittleFS, "/wifimanager.html", "text/html"); //request->redirect("/");
     Serial.print("server.notfound triggered: ");
     Serial.println(request->url());       //This gives some insight into whatever was being requested
   });
 
   server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send(SPIFFS, "/style.css", "text/css");
+    request->send(LittleFS, "/style.css", "text/css");
     Serial.println("Served CSS");
   });
 
@@ -112,7 +114,7 @@ void webServerSetup(){
   server.on("/", HTTP_POST, [](AsyncWebServerRequest *request) {
     int params = request->params();
     for(int i=0;i<params;i++){
-      AsyncWebParameter* p = request->getParam(i);
+      const AsyncWebParameter* p = request->getParam(i);
       if(p->isPost()){
         if (p->name() == PARAM_INPUT_1) {
           mac = p->value().c_str();

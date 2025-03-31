@@ -3,12 +3,13 @@
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncTCP.h>
-#include "SPIFFS.h"
+// #include "SPIFFS.h"
+#include <LittleFS.h>
 
 
 //******************** INITIALIZE SPIFFS ***********************
 void initSPIFFS() {
-  if (!SPIFFS.begin(true)) {
+  if (!LittleFS.begin(true)) {
     //Serial.println("An error has occurred while mounting SPIFFS");
   }
   //Serial.println("SPIFFS mounted successfully");
