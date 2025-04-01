@@ -10,9 +10,9 @@
 #include "ESPAsyncWebServer.h"
 #include "DNSServer.h"
 // #include <wifimanager.h>
-#include "SPIFFS.h"
+// #include "SPIFFS.h"
 // #include "spiffs.h"
-// #include <LittleFS.h>
+#include <LittleFS.h>
 #include <esp_sleep.h>
 #include <EEPROM.h>
 #include <esp_now.h>
@@ -54,9 +54,6 @@ unsigned long startTime; // Variable per emmagatzemar el temps d'inici
 String macAddresses[MAX_NETWORKS];  // Array per emmagatzemar les adreces MAC de les xarxes trobades
 
 
-// REPLACE WITH YOUR RECEIVER MAC Address
-//uint8_t broadcastAddress[] = {0x10, 0x52, 0x1C, 0x88, 0x5D, 0xBD}; //llum //{0xA0, 0x76, 0x4E, 0x36, 0x0A, 0x89};  //PETIT //A0:76:4E:36:0A:89 // BIG  //64:E8:33:C7:62:50
-
 // Structure example to send data
 // Must match the receiver structure
 typedef struct {
@@ -65,8 +62,6 @@ typedef struct {
 
 // Create a struct_message called missatge
 struct_message missatge;
-
-// esp_now_peer_info_t peerInfo;
 
 
 
@@ -122,23 +117,6 @@ void send_ESPNOW(){
   }
 }
 
-// void scanNetworksss() {
-//   Serial.println("Scanning for networks...");
-//   int n = WiFi.scanNetworks();  // Obtenir les xarxes disponibles
-//   if (n == 0) {
-//     Serial.println("No networks found");
-//   } else {
-//     Serial.println("Networks found:");
-//     for (int i = 0; i < n; i++) {
-//       String ssidd = WiFi.SSID(i);  // Obtenir el nom de la xarxa
-//       String macAddress = WiFi.BSSIDstr(i);  // Obtenir l'adreça MAC de la xarxa
-//       Serial.print("SSID: ");
-//       Serial.print(ssidd);
-//       Serial.print(" | MAC Address: ");
-//       Serial.println(macAddress);
-//     }
-//   }
-// }
 
 String* scanNetworks() {
   int n = WiFi.scanNetworks();  // Escaneja les xarxes Wi-Fi disponibles
@@ -166,12 +144,9 @@ String* scanNetworks() {
 
 void webServerSetup(){
 
-  // scanNetworks();  // Cridem la funció per escanejar xarxes i obtenir les MACs
-  
-
   // accedeix aquí just conectar-se a la wifi des de l'ordinador
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(SPIFFS, "/wifimanager.html", "text/html");
+    request->send(LittleFS, "/wifimanager.html", "text/html");
     Serial.println("myweb /");
   });
 
@@ -179,20 +154,20 @@ void webServerSetup(){
   //This is an example of triggering for a known location.  This one seems to be common for android devices
   server.on("/generate_204", HTTP_GET, [](AsyncWebServerRequest *request){
     //request->send(200, "text/plain", "You were sent here by a captive portal after requesting generate_204");
-    request->send(SPIFFS, "/wifimanager.html", "text/html");
+    request->send(LittleFS, "/wifimanager.html", "text/html");
     Serial.println("requested /generate_204");
   });
 
   // accedeix aquí quan busques qualsevol web al navegador
   //This is an example of a redirect type response.  onNotFound acts as a catch-all for any request not defined above
   server.onNotFound([](AsyncWebServerRequest *request){
-    request->send(SPIFFS, "/wifimanager.html", "text/html"); //request->redirect("/");
+    request->send(LittleFS, "/wifimanager.html", "text/html"); //request->redirect("/");
     Serial.print("server.notfound triggered: ");
     Serial.println(request->url());       //This gives some insight into whatever was being requested
   });
 
   server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send(SPIFFS, "/style.css", "text/css");
+    request->send(LittleFS, "/style.css", "text/css");
     Serial.println("Served CSS");
   });
 
@@ -253,14 +228,14 @@ void webServerSetup(){
     
     request->send(200, "text/plain", "Configurat! Ja pots prova");
     delay(1000);
-    esp_deep_sleep_start();
+    // esp_deep_sleep_start();
+    digitalWrite(enBoto, LOW);
     //ESP.restart();
 
   });
   server.begin();                         //Starts the server process
   Serial.println("Web server started");
 }
-
 
 
 void setup() {
@@ -271,8 +246,9 @@ void setup() {
   EEPROM.begin(512);
  //******************** SPIFFS ***********************
   // initSPIFFS();
-  if (!SPIFFS.begin()) {
+  if (!LittleFS.begin()) {
     Serial.println("An error has occurred while mounting SPIFFS");
+    return;
   }
   //mac = EEPROM.read(0);
 
@@ -298,41 +274,13 @@ void setup() {
   // FastLED.show();
 
   config_ESPNOW();
-  // WiFi.mode(WIFI_STA);
-  // // Init ESP-NOW
-  // if (esp_now_init() != ESP_OK) {
-  //   Serial.println("Error initializing ESP-NOW");
-  //   return;
-  // }
-
-  // // Once ESPNow is successfully Init, we will register for Send CB to
-  // // get the status of Trasnmitted packet
-  // esp_now_register_send_cb(OnDataSent);
-  
-  // // Registrar el dispositivo receptor
-  // esp_now_peer_info_t peerInfo = {};
-  // memcpy(peerInfo.peer_addr, receiverMac, 6); //broadcastAddress, 6);
-  // peerInfo.channel = 0;  
-  // peerInfo.encrypt = false;
-  
-  // // Añadir el receptor
-  // if (esp_now_add_peer(&peerInfo) != ESP_OK){
-  //   Serial.println("Failed to add peer");
-  //   return;
-  // }
 
   // Set values to send
-  // strcpy(missatge.a, "THIS IS A CHAR");
-  // missatge.b = random(1,20);
-  // missatge.c = 1.2;
   missatge.estat = false;
   
   // Send message via ESP-NOW
   send_ESPNOW();
-  // esp_err_t result = esp_now_send(receiverMac, (uint8_t *) &missatge, sizeof(missatge));  //broadcastAddress, (uint8_t *) &missatge, sizeof(missatge));
-  // if (result != ESP_OK) {
-  //   Serial.println("Error al enviar el dato");
-  // }
+
   delay(100);
 }
 
@@ -382,17 +330,6 @@ void loop() {
         digitalWrite(enBoto, LOW);
       }
 
-      // detecta si s'ha tornat a presionar el boto, per aleshores apagar
-      // if(!digitalRead(5) || buttonStateLow1){
-      //   buttonStateLow1=true;
-      //   if(digitalRead(5) || buttonStateHigh2){
-      //     buttonStateHigh2 = true;
-      //     if(!digitalRead(5)){
-      //       esp_deep_sleep_start();
-      //     }
-      //   }
-      // }
-
       static bool lastButtonState = HIGH;  // Estat anterior del botó
 
       bool buttonState = digitalRead(Boto);  // Llegeix el botó
@@ -410,7 +347,6 @@ void loop() {
           digitalWrite(enBoto, LOW);
       }
       lastButtonState = buttonState;  // Guardem l'estat per a la següent iteració
-
     }
   }
 
