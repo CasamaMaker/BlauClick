@@ -37,7 +37,7 @@ String strMac;
 byte receiverMac[6];                   //Variables to save values from HTML form
 const char* macPath = "/mac.txt"; // File paths to save input values permanently
 
-String myAddresss;
+String myAddresss, myAddresssDoted, myAddresssEnd;
 
 //****************** DIGITAL LED ******************************
 #include <FastLED.h>
@@ -202,6 +202,11 @@ void webServerSetup(){
     request->send(200, "text/plain", macListStr);
   });
 
+  server.on("/mymac", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "text/plain", myAddresssDoted); //String(mac).c_str());
+    Serial.println(myAddresssDoted);
+});
+
   // reb les variables des de la web
   server.on("/", HTTP_POST, [](AsyncWebServerRequest *request) {
     int params = request->params();
@@ -241,12 +246,13 @@ void webServerSetup(){
 }
 
 void getMyMacAddress() {
-  myAddresss = WiFi.macAddress();
+  myAddresssDoted = WiFi.macAddress();
   Serial.print("MAC del microcontrolador: ");
-  // Eliminem els dos punts
+
+  myAddresss = myAddresssDoted;
   myAddresss.replace(":", "");
   Serial.println(myAddresss);
-  myAddresss = myAddresss.substring(myAddresss.length() - 4);
+  myAddresssEnd = myAddresss.substring(myAddresss.length() - 4);
 
 }
 
@@ -273,6 +279,9 @@ void setup() {
     if (i > 0) strMac += ":"; // Afegim el separador : entre cada byte
     strMac += String(receiverMac[i], HEX); // Convertim el byte a hexadecimal
   }
+
+  // Convertir tota la cadena a majúscules
+  strMac.toUpperCase();
 
 
   pinMode(Boto, INPUT);  // 5 boto
@@ -324,7 +333,7 @@ void loop() {
     leds[0] = CRGB::Red;
     FastLED.show();
     // Concatenar el nom base amb l'adreça MAC
-    String fullSSID = String(ssid) + "_" + myAddresss;
+    String fullSSID = String(ssid) + "_" + myAddresssEnd;
     WiFi.softAP(fullSSID.c_str(), password);            //This starts the WIFI radio in access point mode
     Serial.println("Wifi initialized");
     Serial.println(WiFi.softAPIP());        //Print out the IP address on the serial port (this is where you should end up if the captive portal works)
