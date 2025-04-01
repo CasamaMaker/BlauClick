@@ -16,7 +16,7 @@
 #include <esp_sleep.h>
 #include <EEPROM.h>
 #include <esp_now.h>
-
+#include <WiFi.h>
 
 #define enVBatterySense 0
 #define Boto 1
@@ -37,6 +37,7 @@ String strMac;
 byte receiverMac[6];                   //Variables to save values from HTML form
 const char* macPath = "/mac.txt"; // File paths to save input values permanently
 
+String myAddresss;
 
 //****************** DIGITAL LED ******************************
 #include <FastLED.h>
@@ -112,6 +113,7 @@ void config_ESPNOW(){
 
 void send_ESPNOW(){
   esp_err_t result = esp_now_send(receiverMac, (uint8_t *) &missatge, sizeof(missatge));  //broadcastAddress, (uint8_t *) &missatge, sizeof(missatge));
+  
   char macStr[18];
   snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
            receiverMac[0], receiverMac[1], receiverMac[2],
@@ -119,7 +121,8 @@ void send_ESPNOW(){
   Serial.print(">>>> enviat a ");
   Serial.print(macStr);
   Serial.print(" - Estat: ");
-  Serial.println(missatge.estat);//(const char*) &missatge);
+  Serial.println(missatge.estat);
+
   if (result != ESP_OK) {
     Serial.println("Error al enviar el dato");
   }
@@ -222,15 +225,7 @@ void webServerSetup(){
             }
             EEPROM.commit();
           }
-          //writeFile(SPIFFS, macPath, mac.c_str());  // Write file to save value
-          //writeFile(SPIFFS, ssidPath, ssid.c_str());  // Write file to save value
         }
-        /*if (p->name() == PARAM_INPUT_2) {
-          passs = p->value().c_str();
-          Serial.print("Password set to: ");
-          Serial.println(passs);
-          //writeFile(SPIFFS, passPath, pass.c_str());  // Write file to save value
-        }*/
       }
     }
     
@@ -245,12 +240,22 @@ void webServerSetup(){
   Serial.println("Web server started");
 }
 
+void getMyMacAddress() {
+  myAddresss = WiFi.macAddress();
+  Serial.print("MAC del microcontrolador: ");
+  // Eliminem els dos punts
+  myAddresss.replace(":", "");
+  Serial.println(myAddresss);
+  myAddresss = myAddresss.substring(myAddresss.length() - 4);
+
+}
 
 void setup() {
   startTime = millis(); // Guarda el temps actual en mil·lisegons al iniciar
   Serial.begin(115200);
   // delay(1000);
   // Serial.println("Aaaaaaaaaaaaaaaaaaaa");
+  
   EEPROM.begin(512);
  //******************** SPIFFS ***********************
   // initSPIFFS();
@@ -279,7 +284,7 @@ void setup() {
   // FastLED.show();
 
   config_ESPNOW();
-
+  getMyMacAddress();
   // Set values to send
   missatge.estat = true;
   
@@ -318,7 +323,9 @@ void loop() {
     // FastLED.show();
     leds[0] = CRGB::Red;
     FastLED.show();
-    WiFi.softAP(ssid, password);            //This starts the WIFI radio in access point mode
+    // Concatenar el nom base amb l'adreça MAC
+    String fullSSID = String(ssid) + "_" + myAddresss;
+    WiFi.softAP(fullSSID.c_str(), password);            //This starts the WIFI radio in access point mode
     Serial.println("Wifi initialized");
     Serial.println(WiFi.softAPIP());        //Print out the IP address on the serial port (this is where you should end up if the captive portal works)
     dnsServer.start(53, "*", WiFi.softAPIP());  //This starts the DNS server.  The "*" sends any request for port 53 straight to the IP address of the device
