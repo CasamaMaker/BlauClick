@@ -33,7 +33,7 @@ AsyncWebServer server(80);                //This creates a web server, required 
 DNSServer dnsServer;                      //This creates a DNS server, required for the captive portal
 
 const char* PARAM_INPUT_1 = "mac";  // Search for parameter in HTTP POST request
-String mac;    
+String strMac;    
 byte receiverMac[6];                   //Variables to save values from HTML form
 const char* macPath = "/mac.txt"; // File paths to save input values permanently
 
@@ -112,6 +112,14 @@ void config_ESPNOW(){
 
 void send_ESPNOW(){
   esp_err_t result = esp_now_send(receiverMac, (uint8_t *) &missatge, sizeof(missatge));  //broadcastAddress, (uint8_t *) &missatge, sizeof(missatge));
+  char macStr[18];
+  snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
+           receiverMac[0], receiverMac[1], receiverMac[2],
+           receiverMac[3], receiverMac[4], receiverMac[5]);
+  Serial.print(">>>> enviat a ");
+  Serial.print(macStr);
+  Serial.print(" - Estat: ");
+  Serial.println(missatge.estat);//(const char*) &missatge);
   if (result != ESP_OK) {
     Serial.println("Error al enviar el dato");
   }
@@ -172,8 +180,8 @@ void webServerSetup(){
   });
 
   server.on("/mac", HTTP_GET, [](AsyncWebServerRequest *request) {
-      request->send(200, "text/plain", mac); //String(mac).c_str());
-      Serial.println(mac);
+      request->send(200, "text/plain", strMac); //String(mac).c_str());
+      Serial.println(strMac);
   });
 
   // Ruta per obtenir la llista d'adreces MAC
@@ -198,17 +206,17 @@ void webServerSetup(){
       const AsyncWebParameter* p = request->getParam(i);
       if(p->isPost()){
         if (p->name() == PARAM_INPUT_1) {
-          mac = p->value().c_str();
+          strMac = p->value().c_str();
           Serial.print("Nova adreça MAC: -");
-          Serial.print(mac);
+          Serial.print(strMac);
           Serial.println("-");
           //EEPROM.write(0, String(mac));
-          mac.replace(":", "");
-          if(mac == ""){
+          strMac.replace(":", "");
+          if(strMac == ""){
             Serial.println("no introduida cap mac, no guardar");
           }else{
             for (int i = 0; i < 6; i++) {
-              String byteString = mac.substring(i * 2, i * 2 + 2); // Obtenim cada parell de dígits
+              String byteString = strMac.substring(i * 2, i * 2 + 2); // Obtenim cada parell de dígits
               receiverMac[i] = strtol(byteString.c_str(), NULL, 16); // Convertim el parell a byte
               EEPROM.write(i, receiverMac[i]);
             }
@@ -242,7 +250,7 @@ void setup() {
   startTime = millis(); // Guarda el temps actual en mil·lisegons al iniciar
   Serial.begin(115200);
   // delay(1000);
-  Serial.println("Aaaaaaaaaaaaaaaaaaaa");
+  // Serial.println("Aaaaaaaaaaaaaaaaaaaa");
   EEPROM.begin(512);
  //******************** SPIFFS ***********************
   // initSPIFFS();
@@ -257,13 +265,10 @@ void setup() {
   }
 
   for (int i = 0; i < 6; i++) {
-    if (i > 0) mac += ":"; // Afegim el separador : entre cada byte
-    mac += String(receiverMac[i], HEX); // Convertim el byte a hexadecimal
+    if (i > 0) strMac += ":"; // Afegim el separador : entre cada byte
+    strMac += String(receiverMac[i], HEX); // Convertim el byte a hexadecimal
   }
 
-  /*for (int i = 0; i < 6; i++) {
-      broadcastAddress[i] = receiverMac[i];
-  }*/
 
   pinMode(Boto, INPUT);  // 5 boto
   pinMode(enBoto, OUTPUT);
@@ -276,7 +281,7 @@ void setup() {
   config_ESPNOW();
 
   // Set values to send
-  missatge.estat = false;
+  missatge.estat = true;
   
   // Send message via ESP-NOW
   send_ESPNOW();
@@ -307,7 +312,7 @@ void loop() {
 
   if(startTime + 3000 < millis()){
     //mac = EEPROM.read(0);//readFile(SPIFFS, macPath);
-    Serial.print("MAC guardada:  "); Serial.println(mac);
+    Serial.print("MAC guardada:  "); Serial.println(strMac);
 
     // leds[0] = CRGB::Red;
     // FastLED.show();
