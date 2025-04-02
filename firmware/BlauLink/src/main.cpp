@@ -54,11 +54,15 @@ unsigned long startTime; // Variable per emmagatzemar el temps d'inici
 // Definir un array global per emmagatzemar les adreces MAC
 String macAddresses[MAX_NETWORKS];  // Array per emmagatzemar les adreces MAC de les xarxes trobades
 
+#define CRYPTO_KEY "PASSWORD1"  // La mateixa clau de xifratge que en el dispositiu broker
+
 
 // Structure example to send data
 // Must match the receiver structure
 typedef struct {
-  bool estat;
+  // bool estat;
+  char topic[50];
+  char payload[50];
 } struct_message;
 
 // Create a struct_message called missatge
@@ -94,6 +98,10 @@ void config_ESPNOW(){
     return;
   }
 
+  // Establir la clau de xifratge
+  esp_now_set_pmk((uint8_t *)CRYPTO_KEY);  // Estableix la clau de xifratge per ESP-NOW
+  
+
   // Once ESPNow is successfully Init, we will register for Send CB to
   // get the status of Trasnmitted packet
   esp_now_register_send_cb(OnDataSent);
@@ -118,10 +126,10 @@ void send_ESPNOW(){
   snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
            receiverMac[0], receiverMac[1], receiverMac[2],
            receiverMac[3], receiverMac[4], receiverMac[5]);
-  Serial.print(">>>> enviat a ");
-  Serial.print(macStr);
-  Serial.print(" - Estat: ");
-  Serial.println(missatge.estat);
+  // Serial.print(">>>> enviat a ");
+  // Serial.print(macStr);
+  // Serial.print(" - Estat: ");
+  // Serial.println(missatge.estat);
 
   if (result != ESP_OK) {
     Serial.println("Error al enviar el dato");
@@ -295,7 +303,10 @@ void setup() {
   config_ESPNOW();
   getMyMacAddress();
   // Set values to send
-  missatge.estat = true;
+  // missatge.estat = true;
+  // Per exemple, per encendre la bombeta:
+  strcpy(missatge.topic, "cmnd/bombeta/POWER");
+  strcpy(missatge.payload, "ON");
   
   // Send message via ESP-NOW
   send_ESPNOW();
