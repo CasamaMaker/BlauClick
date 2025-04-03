@@ -54,7 +54,7 @@ unsigned long startTime; // Variable per emmagatzemar el temps d'inici
 // Definir un array global per emmagatzemar les adreces MAC
 String macAddresses[MAX_NETWORKS];  // Array per emmagatzemar les adreces MAC de les xarxes trobades
 
-#define CRYPTO_KEY "PASSWORD1"  // La mateixa clau de xifratge que en el dispositiu broker
+#define CRYPTO_KEY "PASSWORD12345678"//"PASSWORD1"  // La mateixa clau de xifratge que en el dispositiu broker
 
 
 // Structure example to send data
@@ -305,7 +305,7 @@ void setup() {
   // Set values to send
   // missatge.estat = true;
   // Per exemple, per encendre la bombeta:
-  strcpy(missatge.topic, "cmnd/bombeta/POWER");
+  strcpy(missatge.topic, "luz");//"cmnd/bombeta/POWER");
   strcpy(missatge.payload, "ON");
   
   // Send message via ESP-NOW
