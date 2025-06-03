@@ -22,12 +22,12 @@
 #include <esp_now.h>
 #include <FastLED.h>
 
-                              //  V1  | V2
-#define enVBatterySense 0     //  4   | 0
-#define VbatSense 3           //  3   | 3
-#define Boto 1                //  5   | 1
-#define enBoto 4              //  -   | 4
-#define digitalLed 5          //  6   | 5
+                              //  V1  | V2  | Pico-Click
+#define enVBatterySense 0     //  4   | 0   | -   [no implementat encara]
+#define VbatSense 3           //  3   | 3   | 4   [no implementat encara]
+#define Boto 5                //  5   | 1   | 5
+#define enBoto 3              //  -   | 4   | 3   [-: deepsleep mode (variable=99), n: pin mode]
+#define digitalLed 6          //  6   | 5   | 6
 
 #define idioma  "CAT"      // CAT:català (per defecte), EN:english
 
@@ -263,7 +263,12 @@ void webServerSetup(){
     request->send(200, "text/plain", "Configurat! Ja pots prova");
     delay(1000);
     // esp_deep_sleep_start();
-    digitalWrite(enBoto, LOW);
+    // digitalWrite(enBoto, LOW);
+    if(enBoto!=99){
+      digitalWrite(enBoto, LOW);
+    }else{
+      esp_deep_sleep_start();
+    }
     //ESP.restart();
   });
 
@@ -320,8 +325,10 @@ void setup() {
 
 
   pinMode(Boto, INPUT);  // 5 boto
-  pinMode(enBoto, OUTPUT);
-  digitalWrite(enBoto, HIGH);
+  if(enBoto!=99){
+    pinMode(enBoto, OUTPUT);
+    digitalWrite(enBoto, HIGH);
+  }
 
   FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
   leds[0] = CRGB::Black;
@@ -358,6 +365,7 @@ void loop() {
     // // leds[0] = CRGB::Blue;
     // // FastLED.show();
     // delay(100);
+    
     leds[0] = CRGB::Black;
     FastLED.show();
     delay(100);
@@ -366,8 +374,14 @@ void loop() {
     // leds[0] = CRGB::Red;
     // FastLED.show();
     // delay(50);
-    // esp_deep_sleep_start();
-    digitalWrite(enBoto, LOW);
+    Serial.println("A dormir");
+
+    // digitalWrite(enBoto, LOW);
+    if(enBoto!=99){
+      digitalWrite(enBoto, LOW);
+    }else{
+      esp_deep_sleep_start();
+    }
   }
 
 
@@ -395,7 +409,15 @@ void loop() {
       dnsServer.processNextRequest();
       if(startTime + 60000 < millis()){
         // esp_deep_sleep_start();
-        digitalWrite(enBoto, LOW);
+        
+        Serial.println("Temps excedit");
+        delay(200);
+        // digitalWrite(enBoto, LOW);
+        if(enBoto!=99){
+          digitalWrite(enBoto, LOW);
+        }else{
+          esp_deep_sleep_start();
+        }
       }
 
       static bool lastButtonState = HIGH;  // Estat anterior del botó
@@ -412,7 +434,12 @@ void loop() {
           Serial.println("Botó premut després d'alliberar");
           buttonReleased = false;  // Reiniciem per detectar una nova seqüència
           delay(200);
-          digitalWrite(enBoto, LOW);
+          // digitalWrite(enBoto, LOW);
+          if(enBoto!=99){
+            digitalWrite(enBoto, LOW);
+          }else{
+            esp_deep_sleep_start();
+          }
       }
       lastButtonState = buttonState;  // Guardem l'estat per a la següent iteració
     }
