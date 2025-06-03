@@ -6,26 +6,32 @@
 
 
 #include <Arduino.h>
+#include <WiFi.h>
+#include <FS.h>
+#include <LittleFS.h>
+
 #include <AsyncTCP.h>
 #include "ESPAsyncWebServer.h"
 #include "DNSServer.h"
 // #include <wifimanager.h>
 // #include "SPIFFS.h"
 // #include "spiffs.h"
-#include <LittleFS.h>
+
 #include <esp_sleep.h>
 #include <EEPROM.h>
 #include <esp_now.h>
-#include <WiFi.h>
+#include <FastLED.h>
 
-#define enVBatterySense 0
-#define Boto 1
-#define enBoto 4
-#define digitalLed 5
+                              //  V1  | V2
+#define enVBatterySense 0     //  4   | 0
+#define VbatSense 3           //  3   | 3
+#define Boto 1                //  5   | 1
+#define enBoto 4              //  -   | 4
+#define digitalLed 5          //  6   | 5
 
+#define idioma  "CAT"      // CAT:català (per defecte), EN:english
 
-
-const char* ssid = "EspLink-AP"; //Name of the WIFI network hosted by the device
+const char* ssid = "BlauLink-AP"; //Name of the WIFI network hosted by the device
 const char* password =  "";               //Password
 
 AsyncWebServer server(80);                //This creates a web server, required in order to host a page for connected devices
@@ -40,7 +46,7 @@ const char* macPath = "/mac.txt"; // File paths to save input values permanently
 String myAddresss, myAddresssDoted, myAddresssEnd;
 
 //****************** DIGITAL LED ******************************
-#include <FastLED.h>
+// #include <FastLED.h>
 #define NUM_LEDS 1
 #define DATA_PIN digitalLed //6
 #define BRIGHTNESS  15
@@ -136,8 +142,8 @@ void send_ESPNOW(){
   }
 }
 
-
 String* scanNetworks() {
+  Serial.println("scanning networks");
   int n = WiFi.scanNetworks();  // Escaneja les xarxes Wi-Fi disponibles
   int count = 0;  // Comptador per emmagatzemar les adreces MAC trobades
 
@@ -161,29 +167,41 @@ String* scanNetworks() {
   return macAddresses;
 }
 
-void webServerSetup(){
+void serveixWifiManager(AsyncWebServerRequest *request) {
+  String path = "/wifimanager_" + String(idioma) + ".html";
+  request->send(LittleFS, path, "text/html");
+}
 
+
+void webServerSetup(){
   // accedeix aquí just conectar-se a la wifi des de l'ordinador
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(LittleFS, "/wifimanager.html", "text/html");
-    Serial.println("myweb /");
-  });
+  server.on("/", HTTP_GET, serveixWifiManager);
+  // Required
+	server.on("/connecttest.txt", [](AsyncWebServerRequest *request) { request->redirect("http://logout.net"); });	// windows 11 captive portal workaround
+	server.on("/wpad.dat", [](AsyncWebServerRequest *request) { request->send(404); });
+
+
 
   // accedeix aquí just conectar-se a la wifi des del mobil android
-  //This is an example of triggering for a known location.  This one seems to be common for android devices
-  server.on("/generate_204", HTTP_GET, [](AsyncWebServerRequest *request){
-    //request->send(200, "text/plain", "You were sent here by a captive portal after requesting generate_204");
-    request->send(LittleFS, "/wifimanager.html", "text/html");
-    Serial.println("requested /generate_204");
-  });
+  server.on("/generate_204", HTTP_GET, serveixWifiManager);
 
-  // accedeix aquí quan busques qualsevol web al navegador
-  //This is an example of a redirect type response.  onNotFound acts as a catch-all for any request not defined above
-  server.onNotFound([](AsyncWebServerRequest *request){
-    request->send(LittleFS, "/wifimanager.html", "text/html"); //request->redirect("/");
-    Serial.print("server.notfound triggered: ");
-    Serial.println(request->url());       //This gives some insight into whatever was being requested
-  });
+// .  server.on("/connecttest.txt", HTTP_GET, serveixWifiManager);
+  server.on("/ncsi.txt", HTTP_GET, serveixWifiManager);
+  
+  // // Añade estas rutas adicionales para engañar a Windows
+  server.on("/hotspot-detect.html", HTTP_GET, serveixWifiManager);
+  server.on("/library/test/success.html", HTTP_GET, serveixWifiManager);
+  server.on("/success.txt", [](AsyncWebServerRequest *request) { request->send(200); });					   // firefox captive portal call home
+  server.on("/redirect", HTTP_GET, serveixWifiManager);
+  server.on("/fwlink", HTTP_GET, serveixWifiManager);
+  server.on("/cdn-cgi/", HTTP_GET, serveixWifiManager);
+  server.on("/canonical.html", HTTP_GET, serveixWifiManager);
+
+  // return 404 to webpage icon
+	server.on("/favicon.ico", [](AsyncWebServerRequest *request) { request->send(404); });	// webpage icon
+
+
+
 
   server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send(LittleFS, "/style.css", "text/css");
@@ -213,7 +231,7 @@ void webServerSetup(){
   server.on("/mymac", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(200, "text/plain", myAddresssDoted); //String(mac).c_str());
     Serial.println(myAddresssDoted);
-});
+  });
 
   // reb les variables des de la web
   server.on("/", HTTP_POST, [](AsyncWebServerRequest *request) {
@@ -247,8 +265,17 @@ void webServerSetup(){
     // esp_deep_sleep_start();
     digitalWrite(enBoto, LOW);
     //ESP.restart();
-
   });
+
+
+  // accedeix aquí quan busques qualsevol web al navegador
+  server.onNotFound(serveixWifiManager);
+  // // IMPORTANTE: Configurar el manejador para solicitudes no encontradas
+  // server.onNotFound([](AsyncWebServerRequest *request){
+  //   // Esto es crucial para el portal cautivo
+  //   request->redirect("http://" + WiFi.softAPIP().toString());
+  // });
+
   server.begin();                         //Starts the server process
   Serial.println("Web server started");
 }
@@ -267,7 +294,7 @@ void getMyMacAddress() {
 void setup() {
   startTime = millis(); // Guarda el temps actual en mil·lisegons al iniciar
   Serial.begin(115200);
-  // delay(1000);
+  // delay(2000);
   // Serial.println("Aaaaaaaaaaaaaaaaaaaa");
   
   EEPROM.begin(512);
@@ -297,8 +324,8 @@ void setup() {
   digitalWrite(enBoto, HIGH);
 
   FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
-  // leds[0] = CRGB::Blue;
-  // FastLED.show();
+  leds[0] = CRGB::Black;
+  FastLED.show();
 
   config_ESPNOW();
   getMyMacAddress();
@@ -311,7 +338,14 @@ void setup() {
   // Send message via ESP-NOW
   send_ESPNOW();
 
+  // delay(1000);
+
+  // Serial.println("Holaaa");
+  // leds[0] = CRGB::Green;
+  // FastLED.show();
   delay(100);
+  // leds[0] = CRGB::Black;
+  // FastLED.show();
 }
 
 
@@ -319,17 +353,19 @@ void loop() {
   //dnsServer.processNextRequest();         //Without this, the connected device will simply timeout trying to reach the internet
                                           //or it might fall back to mobile data if it has it
   if(digitalRead(Boto)){
-    leds[0] = CRGB::Green;
-    FastLED.show();
     // leds[0] = CRGB::Blue;
     // FastLED.show();
-    delay(100);
+    // // leds[0] = CRGB::Blue;
+    // // FastLED.show();
+    // delay(100);
     leds[0] = CRGB::Black;
     FastLED.show();
     delay(100);
   
   }else{
-    delay(50);
+    // leds[0] = CRGB::Red;
+    // FastLED.show();
+    // delay(50);
     // esp_deep_sleep_start();
     digitalWrite(enBoto, LOW);
   }
@@ -341,7 +377,7 @@ void loop() {
 
     // leds[0] = CRGB::Red;
     // FastLED.show();
-    leds[0] = CRGB::Red;
+    leds[0] = CRGB::Blue;
     FastLED.show();
     // Concatenar el nom base amb l'adreça MAC
     String fullSSID = String(ssid) + "_" + myAddresssEnd;

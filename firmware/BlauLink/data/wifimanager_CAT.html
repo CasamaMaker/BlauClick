@@ -4,188 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="X-UA-Compatible" content="ie=edge" />
-  <title>BlauLink Manager</title>
-  <style>
-    :root {
-      --primary-color: #1a5276;
-      --secondary-color: #2980b9;
-      --background-color: #f8f8f8;
-      --card-background: #fff;
-      --text-color: #333;
-      --border-radius: 8px;
-      --box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      font-family: 'Segoe UI', Arial, sans-serif;
-      background-color: var(--background-color);
-      color: var(--text-color);
-      line-height: 1.6;
-      padding-bottom: 60px; /* Space for footer */
-      min-height: 100vh;
-      position: relative;
-    }
-
-    .container {
-      width: 90%;
-      max-width: 500px;
-      margin: 0 auto;
-      padding: 20px 0;
-    }
-
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 15px 0;
-      margin-bottom: 20px;
-    }
-
-    .header-title {
-      display: flex;
-      align-items: center;
-    }
-
-    h1 {
-      color: var(--primary-color);
-      font-size: 1.8rem;
-      margin: 0;
-    }
-
-    .github-link {
-      display: flex;
-      align-items: center;
-      color: var(--primary-color);
-      text-decoration: none;
-      transition: opacity 0.3s;
-    }
-
-    .github-link:hover {
-      opacity: 0.8;
-    }
-
-    .github-icon {
-      width: 24px;
-      height: 24px;
-      margin-right: 5px;
-    }
-
-    .card {
-      background-color: var(--card-background);
-      border-radius: var(--border-radius);
-      box-shadow: var(--box-shadow);
-      padding: 15px;
-      margin-bottom: 20px;
-    }
-
-    label {
-      display: block;
-      margin-bottom: 8px;
-      font-weight: 600;
-      color: var(--primary-color);
-    }
-
-    .values {
-      padding: 10px;
-      background-color: #f5f5f5;
-      border-radius: 5px;
-      word-break: break-all;
-    }
-
-    .values p {
-      margin: 0;
-      font-size: 16px;
-    }
-
-    .values span {
-      font-weight: bold;
-      color: var(--secondary-color);
-    }
-
-    input[type="text"] {
-      width: 100%;
-      padding: 12px;
-      margin-bottom: 15px;
-      border: 1px solid #ddd;
-      border-radius: var(--border-radius);
-      font-size: 16px;
-      transition: border 0.3s;
-    }
-
-    input[type="text"]:focus {
-      border-color: var(--secondary-color);
-      outline: none;
-    }
-
-    input[type="submit"] {
-      width: 100%;
-      padding: 12px;
-      background-color: var(--primary-color);
-      color: white;
-      border: none;
-      border-radius: var(--border-radius);
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background-color 0.3s;
-    }
-
-    input[type="submit"]:hover {
-      background-color: var(--secondary-color);
-    }
-
-    h3 {
-      margin: 20px 0 10px;
-      color: var(--primary-color);
-    }
-
-    #macList {
-      margin-top: 10px;
-    }
-
-    .mac-item {
-      background-color: #f0f0f0;
-      padding: 12px;
-      margin-bottom: 8px;
-      border-radius: var(--border-radius);
-      transition: background-color 0.2s;
-    }
-
-    .mac-item:hover {
-      background-color: #e0e0e0;
-    }
-    
-    footer {
-      position: absolute;
-      bottom: 0;
-      width: 100%;
-      text-align: center;
-      padding: 15px;
-      background-color: var(--primary-color);
-      color: white;
-      font-size: 14px;
-    }
-    
-    @media (max-width: 480px) {
-      .container {
-        width: 95%;
-      }
-      
-      h1 {
-        font-size: 1.5rem;
-      }
-      
-      .values {
-        padding: 8px;
-      }
-    }
-  </style>
+  <link rel="stylesheet" type="text/css" href="style.css" />
+  <title>Configurador BlauLink</title>
   <script>
     function formatMAC(input) {
         let value = input.value.replace(/[^A-Fa-f0-9]/g, '').toUpperCase();
@@ -280,7 +100,7 @@
   <div class="container">
     <header>
       <div class="header-title">
-        <h1>BlauLink Manager</h1>
+        <h1>Configurador BlauLink</h1>
       </div>
       <a href="https://github.com/CasamaMaker/BlauLink" class="github-link" target="_blank">
         <svg class="github-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -327,7 +147,7 @@
   </div>
   
   <footer>
-    <p>BlauLink 0.1 per Martí Casamayor</p>
+    <p>BlauLink 1.0 | Martí Casamayor [CasamaMaker]</p>
   </footer>
 </body>
 </html>
