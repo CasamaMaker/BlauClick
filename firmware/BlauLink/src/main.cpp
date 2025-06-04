@@ -1,7 +1,5 @@
-/* ESP-32 Captive portal example
- * github.com/elliotmade/ESP32-Captive-Portal-Example
- * This isn't anything new, and doesn't do anything special
- * just an example I would have appreciated while I was searching for a solution
+/* BlauLink projecte
+ * https://github.com/CasamaMaker/BlauLink
  */
 
 
@@ -13,9 +11,6 @@
 #include <AsyncTCP.h>
 #include "ESPAsyncWebServer.h"
 #include "DNSServer.h"
-// #include <wifimanager.h>
-// #include "SPIFFS.h"
-// #include "spiffs.h"
 
 #include <esp_sleep.h>
 #include <EEPROM.h>
@@ -25,11 +20,11 @@
                               //  V1  | V2  | Pico-Click
 #define enVBatterySense 0     //  4   | 0   | -   [no implementat encara]
 #define VbatSense 3           //  3   | 3   | 4   [no implementat encara]
-#define Boto 5                //  5   | 1   | 5
-#define enBoto 3              //  -   | 4   | 3   [-: deepsleep mode (variable=99), n: pin mode]
-#define digitalLed 6          //  6   | 5   | 6
+#define Boto 1                //  5   | 1   | 5
+#define enBoto 4              //  -   | 4   | 3   [-: deepsleep mode (variable=99), n: pin mode]
+#define digitalLed 5          //  6   | 5   | 6
 
-#define idioma  "CAT"      // CAT:català (per defecte), EN:english
+#define idioma  "EN"      // CAT:català (per defecte), EN:english
 
 const char* ssid = "BlauLink-AP"; //Name of the WIFI network hosted by the device
 const char* password =  "";               //Password
@@ -52,7 +47,6 @@ String myAddresss, myAddresssDoted, myAddresssEnd;
 #define BRIGHTNESS  15
 CRGB leds[NUM_LEDS];
 
-
 unsigned long startTime; // Variable per emmagatzemar el temps d'inici
 
 #define MAX_NETWORKS 20  // Definir un límit per al nombre de xarxes que podem guardar
@@ -60,11 +54,10 @@ unsigned long startTime; // Variable per emmagatzemar el temps d'inici
 // Definir un array global per emmagatzemar les adreces MAC
 String macAddresses[MAX_NETWORKS];  // Array per emmagatzemar les adreces MAC de les xarxes trobades
 
-#define CRYPTO_KEY "PASSWORD12345678"//"PASSWORD1"  // La mateixa clau de xifratge que en el dispositiu broker
+// #define CRYPTO_KEY "PASSWORD12345678"//"PASSWORD1"  // La mateixa clau de xifratge que en el dispositiu broker
 
 
-// Structure example to send data
-// Must match the receiver structure
+// Structure data to send
 typedef struct {
   // bool estat;
   char topic[50];
@@ -73,7 +66,6 @@ typedef struct {
 
 // Create a struct_message called missatge
 struct_message missatge;
-
 
 
 // callback when data is sent
@@ -105,7 +97,7 @@ void config_ESPNOW(){
   }
 
   // Establir la clau de xifratge
-  esp_now_set_pmk((uint8_t *)CRYPTO_KEY);  // Estableix la clau de xifratge per ESP-NOW
+  // esp_now_set_pmk((uint8_t *)CRYPTO_KEY);  // Estableix la clau de xifratge per ESP-NOW
   
 
   // Once ESPNow is successfully Init, we will register for Send CB to
@@ -132,10 +124,6 @@ void send_ESPNOW(){
   snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
            receiverMac[0], receiverMac[1], receiverMac[2],
            receiverMac[3], receiverMac[4], receiverMac[5]);
-  // Serial.print(">>>> enviat a ");
-  // Serial.print(macStr);
-  // Serial.print(" - Estat: ");
-  // Serial.println(missatge.estat);
 
   if (result != ESP_OK) {
     Serial.println("Error al enviar el dato");
@@ -172,7 +160,6 @@ void serveixWifiManager(AsyncWebServerRequest *request) {
   request->send(LittleFS, path, "text/html");
 }
 
-
 void webServerSetup(){
   // accedeix aquí just conectar-se a la wifi des de l'ordinador
   server.on("/", HTTP_GET, serveixWifiManager);
@@ -180,15 +167,13 @@ void webServerSetup(){
 	server.on("/connecttest.txt", [](AsyncWebServerRequest *request) { request->redirect("http://logout.net"); });	// windows 11 captive portal workaround
 	server.on("/wpad.dat", [](AsyncWebServerRequest *request) { request->send(404); });
 
-
-
   // accedeix aquí just conectar-se a la wifi des del mobil android
   server.on("/generate_204", HTTP_GET, serveixWifiManager);
 
 // .  server.on("/connecttest.txt", HTTP_GET, serveixWifiManager);
   server.on("/ncsi.txt", HTTP_GET, serveixWifiManager);
   
-  // // Añade estas rutas adicionales para engañar a Windows
+  // Rutas adicionales para engañar a Windows
   server.on("/hotspot-detect.html", HTTP_GET, serveixWifiManager);
   server.on("/library/test/success.html", HTTP_GET, serveixWifiManager);
   server.on("/success.txt", [](AsyncWebServerRequest *request) { request->send(200); });					   // firefox captive portal call home
@@ -199,9 +184,6 @@ void webServerSetup(){
 
   // return 404 to webpage icon
 	server.on("/favicon.ico", [](AsyncWebServerRequest *request) { request->send(404); });	// webpage icon
-
-
-
 
   server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send(LittleFS, "/style.css", "text/css");
@@ -293,23 +275,19 @@ void getMyMacAddress() {
   myAddresss.replace(":", "");
   Serial.println(myAddresss);
   myAddresssEnd = myAddresss.substring(myAddresss.length() - 4);
-
 }
 
 void setup() {
   startTime = millis(); // Guarda el temps actual en mil·lisegons al iniciar
   Serial.begin(115200);
-  // delay(2000);
-  // Serial.println("Aaaaaaaaaaaaaaaaaaaa");
+
   
   EEPROM.begin(512);
  //******************** SPIFFS ***********************
-  // initSPIFFS();
   if (!LittleFS.begin()) {
     Serial.println("An error has occurred while mounting SPIFFS");
     return;
   }
-  //mac = EEPROM.read(0);
 
   for (int i = 0; i < 6; i++) {
     receiverMac[i] = EEPROM.read(i);
@@ -324,7 +302,7 @@ void setup() {
   strMac.toUpperCase();
 
 
-  pinMode(Boto, INPUT);  // 5 boto
+  pinMode(Boto, INPUT);
   if(enBoto!=99){
     pinMode(enBoto, OUTPUT);
     digitalWrite(enBoto, HIGH);
@@ -336,47 +314,24 @@ void setup() {
 
   config_ESPNOW();
   getMyMacAddress();
-  // Set values to send
-  // missatge.estat = true;
-  // Per exemple, per encendre la bombeta:
-  strcpy(missatge.topic, "luz");//"cmnd/bombeta/POWER");
-  strcpy(missatge.payload, "ON");
+
+  
+  strcpy(missatge.topic, "llum");
+  strcpy(missatge.payload, "conmuta");
   
   // Send message via ESP-NOW
   send_ESPNOW();
 
-  // delay(1000);
-
-  // Serial.println("Holaaa");
-  // leds[0] = CRGB::Green;
-  // FastLED.show();
   delay(100);
-  // leds[0] = CRGB::Black;
-  // FastLED.show();
+
 }
 
-
 void loop() {
-  //dnsServer.processNextRequest();         //Without this, the connected device will simply timeout trying to reach the internet
-                                          //or it might fall back to mobile data if it has it
   if(digitalRead(Boto)){
-    // leds[0] = CRGB::Blue;
-    // FastLED.show();
-    // // leds[0] = CRGB::Blue;
-    // // FastLED.show();
-    // delay(100);
-    
     leds[0] = CRGB::Black;
     FastLED.show();
     delay(100);
-  
   }else{
-    // leds[0] = CRGB::Red;
-    // FastLED.show();
-    // delay(50);
-    Serial.println("A dormir");
-
-    // digitalWrite(enBoto, LOW);
     if(enBoto!=99){
       digitalWrite(enBoto, LOW);
     }else{
@@ -386,13 +341,12 @@ void loop() {
 
 
   if(startTime + 3000 < millis()){
-    //mac = EEPROM.read(0);//readFile(SPIFFS, macPath);
+
     Serial.print("MAC guardada:  "); Serial.println(strMac);
 
-    // leds[0] = CRGB::Red;
-    // FastLED.show();
     leds[0] = CRGB::Blue;
     FastLED.show();
+
     // Concatenar el nom base amb l'adreça MAC
     String fullSSID = String(ssid) + "_" + myAddresssEnd;
     WiFi.softAP(fullSSID.c_str(), password);            //This starts the WIFI radio in access point mode
@@ -412,7 +366,7 @@ void loop() {
         
         Serial.println("Temps excedit");
         delay(200);
-        // digitalWrite(enBoto, LOW);
+
         if(enBoto!=99){
           digitalWrite(enBoto, LOW);
         }else{
@@ -434,7 +388,7 @@ void loop() {
           Serial.println("Botó premut després d'alliberar");
           buttonReleased = false;  // Reiniciem per detectar una nova seqüència
           delay(200);
-          // digitalWrite(enBoto, LOW);
+
           if(enBoto!=99){
             digitalWrite(enBoto, LOW);
           }else{
