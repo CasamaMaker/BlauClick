@@ -26,7 +26,7 @@
 
 #define idioma  "CAT"      // CAT:català (per defecte), EN:english
 
-const char* ssid = "BlauLink-AP"; //Name of the WIFI network hosted by the device
+const char* ssid = "BlauLink"; //Name of the WIFI network hosted by the device
 const char* password =  "";               //Password
 
 AsyncWebServer server(80);                //This creates a web server, required in order to host a page for connected devices
@@ -34,7 +34,8 @@ AsyncWebServer server(80);                //This creates a web server, required 
 DNSServer dnsServer;                      //This creates a DNS server, required for the captive portal
 
 const char* PARAM_INPUT_1 = "mac";  // Search for parameter in HTTP POST request
-String strMac;    
+String strMac;  
+char macStr[18];  
 byte receiverMac[6];                   //Variables to save values from HTML form
 const char* macPath = "/mac.txt"; // File paths to save input values permanently
 
@@ -67,6 +68,42 @@ typedef struct {
 // Create a struct_message called missatge
 struct_message missatge;
 
+
+bool isMacValid(const uint8_t* mac) {
+  for (int i = 0; i < 6; i++) {
+    if (mac[i] != 0xFF) return true;
+  }
+  return false;
+}
+
+String macToString(const uint8_t *mac) {
+  char buf[18];  // Buffer estàtic per mantenir la cadena després de sortir de la funció
+  sprintf(buf, "%02X:%02X:%02X:%02X:%02X:%02X",
+          mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+  String s(buf);
+  s.toUpperCase();   // Això modifica 's' i no retorna res
+  return s;
+}
+
+void deleteEeprom(){
+  // Delete 6 bytes of eeprom
+  memset(receiverMac, 0xFF, sizeof(receiverMac));
+  EEPROM.put(0, receiverMac);
+  EEPROM.commit();
+}
+
+void readEeprom(){
+  EEPROM.get(0, receiverMac);   // Get MAC address saved in eeprom
+  // Serial.println("read");
+  // strMac = macToString(receiverMac);
+
+  if (isMacValid(receiverMac)) {
+    strMac = macToString(receiverMac);
+  } else {
+    Serial.println("No hi ha cap MAC guardada");
+    strMac = "FF:FF:FF:FF:FF:FF"; // O posa una cadena indicativa
+  }
+}
 
 // callback when data is sent
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
@@ -117,15 +154,27 @@ void config_ESPNOW(){
 }
 
 void send_ESPNOW(){
+  Serial.print("----->");
+  strMac = macToString(receiverMac);
+
+  Serial.println(strMac);
+  Serial.print(missatge.topic);
+  Serial.println(missatge.payload);
+
   esp_err_t result = esp_now_send(receiverMac, (uint8_t *) &missatge, sizeof(missatge));  //broadcastAddress, (uint8_t *) &missatge, sizeof(missatge));
   
-  char macStr[18];
-  snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
-           receiverMac[0], receiverMac[1], receiverMac[2],
-           receiverMac[3], receiverMac[4], receiverMac[5]);
+  // char macStr[18];
+  // snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
+  //          receiverMac[0], receiverMac[1], receiverMac[2],
+  //          receiverMac[3], receiverMac[4], receiverMac[5]);
+
+  // Serial.print("--");
+  // Serial.println(macStr);
 
   if (result != ESP_OK) {
     Serial.println("Error al enviar el dato");
+  }else{
+    Serial.println("Enviament correcte");
   }
 }
 
@@ -194,19 +243,32 @@ void webServerSetup(){
       Serial.println(strMac);
   });
 
+  server.on("/deletemac", HTTP_GET, [](AsyncWebServerRequest *request) {
+      request->send(200, "text/plain", "macDeleted"); //String(mac).c_str());
+      deleteEeprom();
+      Serial.println("Mac esborrada");
+      readEeprom();
+  });
+
   // Ruta per obtenir la llista d'adreces MAC
   server.on("/macList", HTTP_GET, [](AsyncWebServerRequest *request) {
     String macListStr = "";  // Crear una cadena per a les adreces MAC
     String* macList = scanNetworks();  // Crida a la funció per obtenir les adreces MAC
-    Serial.println(*macList);
+    // Serial.println(*macList);
+
+    Serial.println("Llista de xarxes trobades:");
     for (int i = 0; i < MAX_NETWORKS; i++) {
       if (macList[i] != "") {  // Només afegir adreces MAC no buides
         macListStr += macList[i];  // Afegir l'adreça MAC a la cadena
         macListStr += "\n";  // Afegir un salt de línia entre cada MAC
+
+        // Serial.println(macList[i]);
       }
     }
     // Retornar la cadena amb totes les adreces MAC
     request->send(200, "text/plain", macListStr);
+    Serial.println(macListStr);
+
   });
 
   server.on("/mymac", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -269,13 +331,14 @@ void webServerSetup(){
 void getMyMacAddress() {
   // myAddresssDoted = WiFi.macAddress();  //retorna la MAC de la interfície WiFi STA (station)
   myAddresssDoted = WiFi.softAPmacAddress();    //retorna la MAC de la interfície WiFi AP (access point)
-  Serial.print("MAC del microcontrolador: ");
+  // Serial.print("MAC del microcontrolador: ");
 
   myAddresss = myAddresssDoted;
   myAddresss.replace(":", "");
   Serial.print("La meva adreça MAC (sta)"); Serial.println(myAddresssDoted);
   myAddresssEnd = myAddresss.substring(myAddresss.length() - 4);
 }
+
 
 void setup() {
   startTime = millis();     // Set starting time variable 
@@ -286,48 +349,39 @@ void setup() {
 
   if (!LittleFS.begin()) return Serial.println("Error muntant LittleFS"), void();   // Init. file system
 
+  readEeprom();
 
-  // for (int i = 0; i < 6; i++) {
-  //   receiverMac[i] = EEPROM.read(i);
-  // }
-  EEPROM.get(0, receiverMac);   // Get MAC address saved in eeprom
-
-  // Erase 6 bytes of eeprom
-  // memset(receiverMac, 0xFF, sizeof(receiverMac));
-  // EEPROM.put(0, receiverMac);
-  // EEPROM.commit();
+  // delay(1000);
+  // Serial.println(strMac);
 
 
 
-  // for (int i = 0; i < 6; i++) {
-  //   if (i > 0) strMac += ":"; // Afegim el separador : entre cada byte
-  //   strMac += String(receiverMac[i], HEX); // Convertim el byte a hexadecimal
-  // }
-
-  char macStr[18];
-  sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X",
-        receiverMac[0], receiverMac[1], receiverMac[2],
-        receiverMac[3], receiverMac[4], receiverMac[5]);
-  strMac = macStr;
-  strMac.toUpperCase();        // Convertir tota la cadena a majúscules
 
   // Init. pinout
   pinMode(Boto, INPUT);
   if (enBoto != 99) digitalWrite(enBoto, HIGH), pinMode(enBoto, OUTPUT);
 
-
+  // Init. digital led
   FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
   leds[0] = CRGB::Black;
   FastLED.show();
 
-  config_ESPNOW();
 
-  // set variables to sent
-  strcpy(missatge.topic, "llum");
-  strcpy(missatge.payload, "conmuta");
-  
-  // Send message via ESP-NOW
-  send_ESPNOW();
+  if(isMacValid(receiverMac)){  //strMac != "FF:FF:FF:FF:FF:FF"){
+
+    config_ESPNOW();
+
+    // set variables to sent
+    strcpy(missatge.topic, "llum");
+    strcpy(missatge.payload, "conmuta");
+    
+    // Send message via ESP-NOW
+    send_ESPNOW();
+  }else{
+    Serial.println("No hi ha cap MAC del slave guardada");
+    leds[0] = CRGB::Yellow;
+    FastLED.show();
+  }
 
   delay(10);
 
@@ -354,6 +408,7 @@ void loop() {
     leds[0] = CRGB::Blue;
     FastLED.show();
 
+    WiFi.mode(WIFI_STA);
     // Concatenar el nom base amb l'adreça MAC
     getMyMacAddress();
     String fullSSID = String(ssid) + "_" + myAddresssEnd;

@@ -32,6 +32,17 @@
       xhttp.send();
     }
 
+    function deleteMac() {
+      var xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+          fetchMac(); // Actualizar la MAC guardada después de borrar
+        }
+      };
+      xhttp.open("GET", "/deletemac", true);
+      xhttp.send();
+    }
+
     function fetchMyMac() {
       var xhttp = new XMLHttpRequest();
       xhttp.onreadystatechange = function() {
@@ -118,9 +129,20 @@
     
     <div class="card">
       <label for="macSaved">MAC esclau guardada</label>
-      <div class="values">
+      <div class="values" style="display: flex; justify-content: space-between; align-items: center;">
         <p><span id="macSaved">Carregant...</span></p>
+        <button onclick="deleteMac()" style="background: none; border: none; cursor: pointer; color: var(--primary-color);">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3,6 5,6 21,6"></polyline>
+            <path d="m19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"></path>
+            <line x1="10" y1="11" x2="10" y2="17"></line>
+            <line x1="14" y1="11" x2="14" y2="17"></line>
+          </svg>
+        </button>
       </div>
+      <!-- <div class="values">
+        <p><span id="macSaved">Carregant...</span></p>
+      </div> -->
     </div>
     
     <div class="card">
@@ -147,7 +169,7 @@
   </div>
   
   <footer>
-    <p>BlauLink 1.0 | Martí Casamayor [CasamaMaker]</p>
+    <p>BlauLink 1.0 | Martí Casamayor</p>
   </footer>
 </body>
 </html>
