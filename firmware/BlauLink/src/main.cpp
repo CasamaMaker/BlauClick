@@ -24,7 +24,7 @@
 #define enBoto 4              //  -   | 4   | 3   [-: deepsleep mode (variable=99), n: pin mode]
 #define digitalLed 5          //  6   | 5   | 6
 
-#define idioma  "EN"      // CAT:català (per defecte), EN:english
+#define idioma  "CAT"      // CAT:català (per defecte), EN:english
 
 const char* ssid = "BlauLink-AP"; //Name of the WIFI network hosted by the device
 const char* password =  "";               //Password
@@ -89,16 +89,15 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
 }
 
 void config_ESPNOW(){
+  
   WiFi.mode(WIFI_STA);
+  
   // Init ESP-NOW
   if (esp_now_init() != ESP_OK) {
     Serial.println("Error initializing ESP-NOW");
     return;
   }
 
-  // Establir la clau de xifratge
-  // esp_now_set_pmk((uint8_t *)CRYPTO_KEY);  // Estableix la clau de xifratge per ESP-NOW
-  
 
   // Once ESPNow is successfully Init, we will register for Send CB to
   // get the status of Trasnmitted packet
@@ -268,61 +267,69 @@ void webServerSetup(){
 }
 
 void getMyMacAddress() {
-  myAddresssDoted = WiFi.macAddress();
+  // myAddresssDoted = WiFi.macAddress();  //retorna la MAC de la interfície WiFi STA (station)
+  myAddresssDoted = WiFi.softAPmacAddress();    //retorna la MAC de la interfície WiFi AP (access point)
   Serial.print("MAC del microcontrolador: ");
 
   myAddresss = myAddresssDoted;
   myAddresss.replace(":", "");
-  Serial.println(myAddresss);
+  Serial.print("La meva adreça MAC (sta)"); Serial.println(myAddresssDoted);
   myAddresssEnd = myAddresss.substring(myAddresss.length() - 4);
 }
 
 void setup() {
-  startTime = millis(); // Guarda el temps actual en mil·lisegons al iniciar
-  Serial.begin(115200);
-
+  startTime = millis();     // Set starting time variable 
   
-  EEPROM.begin(512);
- //******************** SPIFFS ***********************
-  if (!LittleFS.begin()) {
-    Serial.println("An error has occurred while mounting SPIFFS");
-    return;
-  }
+  Serial.begin(115200);     // Init. serial port
+  
+  EEPROM.begin(6);        // Init. eeprom memory (or 512)
 
-  for (int i = 0; i < 6; i++) {
-    receiverMac[i] = EEPROM.read(i);
-  }
-
-  for (int i = 0; i < 6; i++) {
-    if (i > 0) strMac += ":"; // Afegim el separador : entre cada byte
-    strMac += String(receiverMac[i], HEX); // Convertim el byte a hexadecimal
-  }
-
-  // Convertir tota la cadena a majúscules
-  strMac.toUpperCase();
+  if (!LittleFS.begin()) return Serial.println("Error muntant LittleFS"), void();   // Init. file system
 
 
+  // for (int i = 0; i < 6; i++) {
+  //   receiverMac[i] = EEPROM.read(i);
+  // }
+  EEPROM.get(0, receiverMac);   // Get MAC address saved in eeprom
+
+  // Erase 6 bytes of eeprom
+  // memset(receiverMac, 0xFF, sizeof(receiverMac));
+  // EEPROM.put(0, receiverMac);
+  // EEPROM.commit();
+
+
+
+  // for (int i = 0; i < 6; i++) {
+  //   if (i > 0) strMac += ":"; // Afegim el separador : entre cada byte
+  //   strMac += String(receiverMac[i], HEX); // Convertim el byte a hexadecimal
+  // }
+
+  char macStr[18];
+  sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X",
+        receiverMac[0], receiverMac[1], receiverMac[2],
+        receiverMac[3], receiverMac[4], receiverMac[5]);
+  strMac = macStr;
+  strMac.toUpperCase();        // Convertir tota la cadena a majúscules
+
+  // Init. pinout
   pinMode(Boto, INPUT);
-  if(enBoto!=99){
-    pinMode(enBoto, OUTPUT);
-    digitalWrite(enBoto, HIGH);
-  }
+  if (enBoto != 99) digitalWrite(enBoto, HIGH), pinMode(enBoto, OUTPUT);
+
 
   FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
   leds[0] = CRGB::Black;
   FastLED.show();
 
   config_ESPNOW();
-  getMyMacAddress();
 
-  
+  // set variables to sent
   strcpy(missatge.topic, "llum");
   strcpy(missatge.payload, "conmuta");
   
   // Send message via ESP-NOW
   send_ESPNOW();
 
-  delay(100);
+  delay(10);
 
 }
 
@@ -348,6 +355,7 @@ void loop() {
     FastLED.show();
 
     // Concatenar el nom base amb l'adreça MAC
+    getMyMacAddress();
     String fullSSID = String(ssid) + "_" + myAddresssEnd;
     WiFi.softAP(fullSSID.c_str(), password);            //This starts the WIFI radio in access point mode
     Serial.println("Wifi initialized");
