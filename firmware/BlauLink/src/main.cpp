@@ -68,6 +68,13 @@ typedef struct {
 // Create a struct_message called missatge
 struct_message missatge;
 
+#include "esp_adc_cal.h"
+
+esp_adc_cal_characteristics_t adc_chars;
+
+float batteryVoltage;
+int batteryLevel;
+bool isCharging;
 
 bool isMacValid(const uint8_t* mac) {
   for (int i = 0; i < 6; i++) {
@@ -203,18 +210,44 @@ String* scanNetworks() {
   return macAddresses;
 }
 
-// Función para leer el voltaje de la batería
 float getBatteryVoltage() {
-    // Ejemplo usando ADC para leer voltaje de batería
-    // Asumiendo que tienes un divisor de voltaje conectado al pin analógico
-    const int batteryPin = A0; // o el pin que uses
-    const float referenceVoltage = 3.3; // Voltaje de referencia del ESP32
-    const float voltageDividerRatio = 2.0; // Si usas divisor de voltaje 1:1
-    
-    int adcValue = analogRead(batteryPin);
-    float voltage = (adcValue * referenceVoltage / 4095.0) * voltageDividerRatio;
-    
-    return voltage;
+  const int enBatterySensePin = 0;
+  pinMode(enBatterySensePin, OUTPUT);
+  digitalWrite(enBatterySensePin, LOW);  
+  
+  const int batteryPin = 3;  // GPIO que llegeix la bateria
+  const float voltageDividerRatio = 2.0;  // divisor resistiu 1:1
+  static esp_adc_cal_characteristics_t adc_chars;  // característiques de calibració
+
+  // Calibració de l'ADC (només cal fer-ho un cop, però no és greu repetir)
+  esp_adc_cal_characterize(
+      ADC_UNIT_1,
+      ADC_ATTEN_DB_12,  // Fins a ~2.2V — ideal per llegir fins a 2.1V
+      ADC_WIDTH_BIT_12,
+      ESP_ADC_CAL_VAL_EFUSE_VREF,  // Usa la Vref gravada al xip si està disponible
+      &adc_chars
+  );
+
+  // // Llegir el valor cru
+  // uint32_t raw = analogRead(batteryPin);
+
+  // // Convertir a mil·liVolts tenint en compte la calibració
+  // uint32_t voltage_mV = esp_adc_cal_raw_to_voltage(raw, &adc_chars);
+
+
+  uint32_t sum_mV = 0;
+  for (int i = 0; i < 10; i++) {
+    uint32_t raw = analogRead(batteryPin);
+    sum_mV += esp_adc_cal_raw_to_voltage(raw, &adc_chars);
+    delay(2);  // petita pausa per estabilitzar lectura
+  }
+  uint32_t voltage_mV = sum_mV / 10;
+
+  // Serial.println(voltage_mV);
+
+  // Tornar la tensió real de la bateria
+  // Serial.println (voltage_mV * voltageDividerRatio/ 1000.0) ;  // volts
+  return (voltage_mV * voltageDividerRatio) / 1000.0;  // volts
 }
 
 // Función para calcular el porcentaje de batería
@@ -318,9 +351,9 @@ void webServerSetup(){
 
   server.on("/battery", HTTP_GET, [](AsyncWebServerRequest *request) {
     // Obtener el nivel de batería (esto depende de tu configuración de hardware)
-    float batteryVoltage = 3.8;//getBatteryVoltage(); // Función que debes implementar
-    int batteryLevel = 100;//calculateBatteryPercentage(batteryVoltage);
-    bool isCharging = true;//isDeviceCharging(); // Función que debes implementar
+    // float batteryVoltage = 3.8;//getBatteryVoltage(); // Función que debes implementar
+    // int batteryLevel = 100;//calculateBatteryPercentage(batteryVoltage);
+    // bool isCharging = true;//isDeviceCharging(); // Función que debes implementar
     
     // Crear JSON response
     String jsonResponse = "{";
@@ -330,6 +363,12 @@ void webServerSetup(){
     
     request->send(200, "application/json", jsonResponse);
     Serial.println("Battery info sent: " + String(batteryLevel) + "% - Charging: " + String(isCharging));
+    batteryVoltage = getBatteryVoltage(); // Función que debes implementar
+    batteryLevel = calculateBatteryPercentage(batteryVoltage);
+    isCharging = false;//isDeviceCharging(); // Función que debes implementar
+
+  Serial.println(batteryVoltage);
+  Serial.println(batteryLevel);
 });
 
   // reb les variables des de la web
@@ -409,8 +448,15 @@ void setup() {
 
   // delay(1000);
   // Serial.println(strMac);
+  // getBatteryVoltage();
 
 
+  batteryVoltage = getBatteryVoltage(); // Función que debes implementar
+  batteryLevel = calculateBatteryPercentage(batteryVoltage);
+  isCharging = false;//isDeviceCharging(); // Función que debes implementar
+
+  Serial.println(batteryVoltage);
+  Serial.println(batteryLevel);
 
 
   // Init. pinout

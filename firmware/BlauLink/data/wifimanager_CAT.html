@@ -194,11 +194,10 @@
     window.onload = function() {
       fetchMyMac();
       fetchMac();
+      // simulateBattery();  // Para demo, usar batería simulada
+      fetchBatteryLevel();  //per llegir info real de bateria
       fetchMacList();
 
-      // fetchBatteryLevel();  //per llegir info real de bateria
-      simulateBattery();  // Para demo, usar batería simulada
-      
       // Establecer un temporizador para actualizar la lista de dispositivos cada 30 segundos
       setInterval(refreshDevices, 30000);
       // // Actualizar batería cada 60 segundos
