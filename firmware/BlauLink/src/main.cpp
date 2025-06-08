@@ -203,6 +203,46 @@ String* scanNetworks() {
   return macAddresses;
 }
 
+// Función para leer el voltaje de la batería
+float getBatteryVoltage() {
+    // Ejemplo usando ADC para leer voltaje de batería
+    // Asumiendo que tienes un divisor de voltaje conectado al pin analógico
+    const int batteryPin = A0; // o el pin que uses
+    const float referenceVoltage = 3.3; // Voltaje de referencia del ESP32
+    const float voltageDividerRatio = 2.0; // Si usas divisor de voltaje 1:1
+    
+    int adcValue = analogRead(batteryPin);
+    float voltage = (adcValue * referenceVoltage / 4095.0) * voltageDividerRatio;
+    
+    return voltage;
+}
+
+// Función para calcular el porcentaje de batería
+int calculateBatteryPercentage(float voltage) {
+    // Valores típicos para batería LiPo
+    const float minVoltage = 3.2; // Voltaje mínimo de la batería
+    const float maxVoltage = 4.2; // Voltaje máximo de la batería
+    
+    if (voltage >= maxVoltage) return 100;
+    if (voltage <= minVoltage) return 0;
+    
+    int percentage = ((voltage - minVoltage) / (maxVoltage - minVoltage)) * 100;
+    return constrain(percentage, 0, 100);
+}
+
+// Función para detectar si está cargando
+bool isDeviceCharging() {
+    // Esto depende de tu circuito de carga
+    // Podrías usar un pin digital para detectar el estado de carga
+    const int chargingPin = 2; // Pin conectado al indicador de carga
+    
+    // Si tienes un pin que se pone HIGH cuando está cargando
+    return digitalRead(chargingPin) == HIGH;
+    
+    // Alternativa: detectar por incremento de voltaje
+    // (requiere mediciones consecutivas)
+}
+
 void serveixWifiManager(AsyncWebServerRequest *request) {
   String path = "/wifimanager_" + String(idioma) + ".html";
   request->send(LittleFS, path, "text/html");
@@ -275,6 +315,22 @@ void webServerSetup(){
     request->send(200, "text/plain", myAddresssDoted); //String(mac).c_str());
     Serial.println(myAddresssDoted);
   });
+
+  server.on("/battery", HTTP_GET, [](AsyncWebServerRequest *request) {
+    // Obtener el nivel de batería (esto depende de tu configuración de hardware)
+    float batteryVoltage = 3.8;//getBatteryVoltage(); // Función que debes implementar
+    int batteryLevel = 100;//calculateBatteryPercentage(batteryVoltage);
+    bool isCharging = true;//isDeviceCharging(); // Función que debes implementar
+    
+    // Crear JSON response
+    String jsonResponse = "{";
+    jsonResponse += "\"level\":" + String(batteryLevel) + ",";
+    jsonResponse += "\"charging\":" + String(isCharging ? "true" : "false");
+    jsonResponse += "}";
+    
+    request->send(200, "application/json", jsonResponse);
+    Serial.println("Battery info sent: " + String(batteryLevel) + "% - Charging: " + String(isCharging));
+});
 
   // reb les variables des de la web
   server.on("/", HTTP_POST, [](AsyncWebServerRequest *request) {
