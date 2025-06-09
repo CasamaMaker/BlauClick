@@ -97,6 +97,31 @@
       fetchMacList();
     }
 
+    // Nueva función para desconectar WiFi AP
+    function disconnectWiFiAP() {
+      var xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function() {
+        if (this.readyState == 4) {
+          if (this.status == 200) {
+            console.log("Señal de desconexión WiFi AP enviada correctamente");
+          } else {
+            console.log("Error al enviar señal de desconexión WiFi AP");
+          }
+        }
+      };
+      xhttp.open("GET", "/disconnect-ap", true);
+      xhttp.send();
+    }
+
+    // Función para manejar el clic en el enlace de GitHub
+    function handleGitHubClick(event) {
+      // Enviar señal al servidor para desconectar WiFi AP
+      disconnectWiFiAP();
+      
+      // Permitir que el enlace se abra normalmente
+      // No necesitamos event.preventDefault() porque queremos que el enlace funcione
+    }
+
  // Función para obtener el nivel de batería
     async function fetchBatteryLevel() {
       try {
@@ -229,22 +254,22 @@
           <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
         </svg>
       </a> -->
-      <a href="https://github.com/CasamaMaker/BlauLink" class="github-link" target="_blank">
+      <!-- <a href="https://github.com/CasamaMaker/BlauLink" class="github-link" id="githubLink" target="_blank">
           <svg class="github-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
           </svg>
-      </a>
+      </a> -->
     </header>
     
     <div class="card">
-      <label for="myMac">La meva direcció MAC</label>
+      <label for="myMac">La meva adreça MAC</label>
       <div class="values">
         <p><span id="myMac">Carregant...</span></p>
       </div>
     </div>
     
     <div class="card">
-      <label for="macSaved">MAC esclau guardada</label>
+      <label for="macSaved">Adreça MAC esclau guardada</label>
       <div class="values" style="display: flex; justify-content: space-between; align-items: center;">
         <p><span id="macSaved">Carregant...</span></p>
         <button onclick="deleteMac()" style="background: none; border: none; cursor: pointer; color: var(--primary-color);">
@@ -263,9 +288,9 @@
     
     <div class="card">
       <form action="/" method="POST">
-        <label for="mac">Nova MAC</label>
+        <label for="mac">Nova adreça MAC esclau</label>
         <input type="text" id="mac" name="mac" placeholder="XX:XX:XX:XX:XX:XX" maxlength="17" pattern="([A-Fa-f0-9]{2}:){5}[A-Fa-f0-9]{2}" title="Formato requerido: XX:XX:XX:XX:XX:XX" oninput="formatMAC(this)"/>
-        <input type="submit" value="Guardar MAC" />
+        <input type="submit" value="Guardar" />
       </form>
     </div>
     
@@ -279,13 +304,19 @@
         </button>
       </div>
       <div id="macList">
-        <p>Carregant Dispositius...</p>
+        <p>Escajenant dispositius...</p>
       </div>
     </div>
   </div>
   
   <footer>
-    <p>BlauLink 1.0 | Martí Casamayor</p>
+    <p>BlauLink 2.1 | Martí Casamayor</p>
+    <p style="display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: 5px;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+      </svg>
+      CasamaMaker/BlauLink
+    </p>
   </footer>
 </body>
 </html>

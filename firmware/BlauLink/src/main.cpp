@@ -363,13 +363,34 @@ void webServerSetup(){
     
     request->send(200, "application/json", jsonResponse);
     Serial.println("Battery info sent: " + String(batteryLevel) + "% - Charging: " + String(isCharging));
-    batteryVoltage = getBatteryVoltage(); // Función que debes implementar
-    batteryLevel = calculateBatteryPercentage(batteryVoltage);
-    isCharging = false;//isDeviceCharging(); // Función que debes implementar
 
-  Serial.println(batteryVoltage);
-  Serial.println(batteryLevel);
-});
+    // batteryVoltage = getBatteryVoltage(); // Función que debes implementar
+    // batteryLevel = calculateBatteryPercentage(batteryVoltage);
+    // isCharging = false;//isDeviceCharging(); // Función que debes implementar
+
+    // Serial.println(batteryVoltage);
+    // Serial.println(batteryLevel);
+  });
+
+  server.on("/disconnect-ap", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "text/plain", "Disconnecting WiFi AP...");
+    
+    delay(1000);
+    // esp_deep_sleep_start();
+    // digitalWrite(enBoto, LOW);
+    if(enBoto!=99){
+      digitalWrite(enBoto, LOW);
+    }else{
+      esp_deep_sleep_start();
+    }
+    // // Apagar WiFi abans de dormir
+    // dnsServer.stop();
+    // webServer.end();
+    // WiFi.softAPdisconnect(true);
+    // WiFi.mode(WIFI_OFF);
+    // btStop();
+    // esp_wifi_stop();
+  });
 
   // reb les variables des de la web
   server.on("/", HTTP_POST, [](AsyncWebServerRequest *request) {
