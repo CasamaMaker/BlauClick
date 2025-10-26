@@ -17,12 +17,37 @@
 #include <esp_now.h>
 #include <FastLED.h>
 
-                              //  V1  | V2  | Pico-Click
-#define enVBatterySense 0     //  4   | 0   | -   [no implementat encara]
-#define VbatSense 3           //  3   | 3   | 4   [no implementat encara]
-#define Boto 1                //  5   | 1   | 5
-#define enBoto 4              //  -   | 4   | 3   [-: deepsleep mode (variable=99), n: pin mode]
-#define digitalLed 5          //  6   | 5   | 6
+
+
+// #define BLAULINK_V1
+#define BLAULINK_V2
+// #define PICO_CLICK
+
+
+#if defined(BLAULINK_V1)
+  #define enVBatterySense 4
+  #define VbatSense 3
+  #define Boto 5
+  #define enBoto 99  // 99 per indicar no disponible o mode deepsleep
+  #define digitalLed 6
+
+#elif defined(BLAULINK_V2)
+  #define enVBatterySense 0
+  #define VbatSense 3
+  #define Boto 1
+  #define enBoto 4
+  #define digitalLed 5
+
+#elif defined(PICO_CLICK)
+  #define enVBatterySense 99  // No implementat
+  #define VbatSense 4
+  #define Boto 5
+  #define enBoto 3
+  #define digitalLed 6
+
+#else
+  #error "Defineix una versió del dispositiu (BLAULINK_V1, BLAULINK_V2 o PICO_CLICK)"
+#endif
 
 #define idioma  "CAT"      // CAT:català (per defecte), EN:english
 
@@ -50,7 +75,7 @@ CRGB leds[NUM_LEDS];
 
 unsigned long startTime; // Variable per emmagatzemar el temps d'inici
 
-#define MAX_NETWORKS 20  // Definir un límit per al nombre de xarxes que podem guardar
+#define MAX_NETWORKS 5  // Definir un límit per al nombre de xarxes que podem guardar
 
 // Definir un array global per emmagatzemar les adreces MAC
 String macAddresses[MAX_NETWORKS];  // Array per emmagatzemar les adreces MAC de les xarxes trobades
@@ -211,11 +236,11 @@ String* scanNetworks() {
 }
 
 float getBatteryVoltage() {
-  const int enBatterySensePin = 0;
-  pinMode(enBatterySensePin, OUTPUT);
-  digitalWrite(enBatterySensePin, LOW);  
+  // const int enBatterySensePin = 0;
+  pinMode(enVBatterySense, OUTPUT);
+  digitalWrite(enVBatterySense, LOW);  
   
-  const int batteryPin = 3;  // GPIO que llegeix la bateria
+  // const int batteryPin = 3;  // GPIO que llegeix la bateria
   const float voltageDividerRatio = 2.0;  // divisor resistiu 1:1
   static esp_adc_cal_characteristics_t adc_chars;  // característiques de calibració
 
@@ -237,7 +262,7 @@ float getBatteryVoltage() {
 
   uint32_t sum_mV = 0;
   for (int i = 0; i < 10; i++) {
-    uint32_t raw = analogRead(batteryPin);
+    uint32_t raw = analogRead(VbatSense);
     sum_mV += esp_adc_cal_raw_to_voltage(raw, &adc_chars);
     delay(2);  // petita pausa per estabilitzar lectura
   }
@@ -455,11 +480,26 @@ void getMyMacAddress() {
   myAddresssEnd = myAddresss.substring(myAddresss.length() - 4);
 }
 
+void wifiApModeServer(){
+  WiFi.mode(WIFI_STA);    // Iniciat wifi en station mode per poder llegir la MAC
+  
+  getMyMacAddress();
+  String fullSSID = String(ssid) + "_" + myAddresssEnd;     // Concatenar el nom base ssid amb els últims 4 digits de l'adreça MAC
+  WiFi.softAP(fullSSID.c_str(), password);                  //This starts the WIFI radio in access point mode
+  Serial.println("Wifi initialized");
+  Serial.println(WiFi.softAPIP());                          //Print out the IP address
+  
+  dnsServer.start(53, "*", WiFi.softAPIP());                //This starts the DNS server.  The "*" sends any request for port 53 straight to the IP address of the device
+  
+  webServerSetup();                                         //Configures the behavior of the web server
+  Serial.println("Setup complete");
+}
 
 void setup() {
   startTime = millis();     // Set starting time variable 
   
   Serial.begin(115200);     // Init. serial port
+  // delay(1000);
   
   EEPROM.begin(6);        // Init. eeprom memory (or 512)
 
@@ -467,7 +507,7 @@ void setup() {
 
   readEeprom();
 
-  // delay(1000);
+
   // Serial.println(strMac);
   // getBatteryVoltage();
 
@@ -476,6 +516,7 @@ void setup() {
   batteryLevel = calculateBatteryPercentage(batteryVoltage);
   isCharging = false;//isDeviceCharging(); // Función que debes implementar
 
+  // Serial.println("holaaaaaaaaaaaa");
   Serial.println(batteryVoltage);
   Serial.println(batteryLevel);
 
@@ -531,57 +572,52 @@ void loop() {
     leds[0] = CRGB::Blue;
     FastLED.show();
 
-    WiFi.mode(WIFI_STA);
-    // Concatenar el nom base amb l'adreça MAC
-    getMyMacAddress();
-    String fullSSID = String(ssid) + "_" + myAddresssEnd;
-    WiFi.softAP(fullSSID.c_str(), password);            //This starts the WIFI radio in access point mode
-    Serial.println("Wifi initialized");
-    Serial.println(WiFi.softAPIP());        //Print out the IP address on the serial port (this is where you should end up if the captive portal works)
-    dnsServer.start(53, "*", WiFi.softAPIP());  //This starts the DNS server.  The "*" sends any request for port 53 straight to the IP address of the device
-    webServerSetup();                       //Configures the behavior of the web server
-    Serial.println("Setup complete");
+    wifiApModeServer();
 
+
+    
     bool buttonStateLow1=false;
     bool buttonStateHigh2=false;
     bool buttonReleased = false;
     while(1){
-      dnsServer.processNextRequest();
-      if(startTime + 60000 < millis()){
-        // esp_deep_sleep_start();
-        
+      dnsServer.processNextRequest();     //requisit dns constant
+      
+
+      if(startTime + 60000 < millis()){         // s'apaga l'equip després de 60 segons
         Serial.println("Temps excedit");
         delay(200);
 
-        if(enBoto!=99){
+        if(enBoto!=99){                         // s'apaga per enLDO o per deepsleep
           digitalWrite(enBoto, LOW);
         }else{
           esp_deep_sleep_start();
         }
       }
 
-      static bool lastButtonState = HIGH;  // Estat anterior del botó
 
-      bool buttonState = digitalRead(Boto);  // Llegeix el botó
+
+      // seqüència per detectar que el boto es deixa de presionar i es torna a presionar, per apagar l'equip
+      static bool lastButtonState = HIGH;       // Estat anterior del botó
+      bool buttonState = digitalRead(Boto);     // Llegeix el botó
 
       if (buttonState == LOW && lastButtonState == HIGH && !buttonReleased) {
-          buttonReleased = true;  // Marquem que s'ha alliberat el botó
+          buttonReleased = true;                // Marquem que s'ha alliberat el botó
           Serial.println("Botó alliberat");
           delay(200);
       }
 
       if (buttonState == HIGH && lastButtonState == LOW && buttonReleased) {
           Serial.println("Botó premut després d'alliberar");
-          buttonReleased = false;  // Reiniciem per detectar una nova seqüència
+          buttonReleased = false;                 // Reiniciem per detectar una nova seqüència
           delay(200);
 
-          if(enBoto!=99){
+          if(enBoto!=99){                         // s'apaga per enLDO o per deepsleep
             digitalWrite(enBoto, LOW);
           }else{
             esp_deep_sleep_start();
           }
       }
-      lastButtonState = buttonState;  // Guardem l'estat per a la següent iteració
+      lastButtonState = buttonState;              // Guardem l'estat per a la següent iteració
     }
   }
 
