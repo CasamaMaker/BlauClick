@@ -74,9 +74,12 @@ Ensure ESP32 board support is installed.
        EspLink-AP_xxxx
 
 4. Connect to it  
-5. Open the configuration web page  
+5. Open the configuration web page
+<p align="center">
+  <img src="pictures/web-manager.png" width="400">
+</p>
 6. Set your target device  
-![](pictures/web-manager.png) <img src="https://github.com/CasamaMaker/CasamaMaker/blob/main/CasamaMaker-textlogo.png"  width="300" align="right">
+
 ---
 
 ### Typical Use Cases
