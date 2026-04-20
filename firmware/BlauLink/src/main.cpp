@@ -1,3 +1,4 @@
+// Blaulink, codi que te el boto que va amb bateria
 /* BlauLink projecte
  * https://github.com/CasamaMaker/BlauLink
  */
@@ -16,6 +17,8 @@
 #include <EEPROM.h>
 #include <esp_now.h>
 #include <FastLED.h>
+#include "blauprotocol.h"
+#include "blauprotocol_link.h"
 
 
 
@@ -83,15 +86,19 @@ String macAddresses[MAX_NETWORKS];  // Array per emmagatzemar les adreces MAC de
 // #define CRYPTO_KEY "PASSWORD12345678"//"PASSWORD1"  // La mateixa clau de xifratge que en el dispositiu broker
 
 
-// Structure data to send
-typedef struct {
-  // bool estat;
-  char topic[50];
-  char payload[50];
-} struct_message;
+// // Structure data to send
+// typedef struct {
+//   // bool estat;
+//   char topic[50];
+//   char payload[50];
+// } struct_message;
 
-// Create a struct_message called missatge
-struct_message missatge;
+// // Create a struct_message called missatge
+// struct_message missatge;
+
+// BlauProtocol: comptador de seqüència (circular 0–255)
+static uint8_t blau_seq = 0;
+
 
 #include "esp_adc_cal.h"
 
@@ -185,28 +192,44 @@ void config_ESPNOW(){
   }
 }
 
-void send_ESPNOW(){
-  Serial.print("----->");
-  strMac = macToString(receiverMac);
+// void send_ESPNOW(){
+//   Serial.print("----->");
+//   strMac = macToString(receiverMac);
 
-  Serial.println(strMac);
-  Serial.print(missatge.topic);
-  Serial.println(missatge.payload);
+//   Serial.println(strMac);
+//   Serial.print(missatge.topic);
+//   Serial.println(missatge.payload);
 
-  esp_err_t result = esp_now_send(receiverMac, (uint8_t *) &missatge, sizeof(missatge));  //broadcastAddress, (uint8_t *) &missatge, sizeof(missatge));
+//   esp_err_t result = esp_now_send(receiverMac, (uint8_t *) &missatge, sizeof(missatge));  //broadcastAddress, (uint8_t *) &missatge, sizeof(missatge));
   
-  // char macStr[18];
-  // snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
-  //          receiverMac[0], receiverMac[1], receiverMac[2],
-  //          receiverMac[3], receiverMac[4], receiverMac[5]);
+//   // char macStr[18];
+//   // snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
+//   //          receiverMac[0], receiverMac[1], receiverMac[2],
+//   //          receiverMac[3], receiverMac[4], receiverMac[5]);
 
-  // Serial.print("--");
-  // Serial.println(macStr);
+//   // Serial.print("--");
+//   // Serial.println(macStr);
+
+//   if (result != ESP_OK) {
+//     Serial.println("Error al enviar el dato");
+//   }else{
+//     Serial.println("Enviament correcte");
+//   }
+// }
+
+void send_ESPNOW(){
+  BlauPacket_t pkt;
+  blau_build_event_packet(&pkt, blau_seq, EVT_CLICK_1);
+  blau_seq++;
+
+  Serial.print("Enviant BlauPacket seq="); Serial.println(pkt.seq);
+
+  esp_err_t result = esp_now_send(receiverMac, (uint8_t*)&pkt, sizeof(pkt));
 
   if (result != ESP_OK) {
-    Serial.println("Error al enviar el dato");
-  }else{
-    Serial.println("Enviament correcte");
+    Serial.println("Error al enviar el paquet");
+  } else {
+    Serial.println("Paquet enviat correctament");
   }
 }
 
@@ -497,6 +520,10 @@ void wifiApModeServer(){
 
 void setup() {
   startTime = millis();     // Set starting time variable 
+
+  // Init. pinout
+  pinMode(Boto, INPUT);
+  if (enBoto != 99) pinMode(enBoto, OUTPUT), digitalWrite(enBoto, HIGH);
   
   Serial.begin(115200);     // Init. serial port
   // delay(1000);
@@ -521,9 +548,9 @@ void setup() {
   Serial.println(batteryLevel);
 
 
-  // Init. pinout
-  pinMode(Boto, INPUT);
-  if (enBoto != 99) digitalWrite(enBoto, HIGH), pinMode(enBoto, OUTPUT);
+  // // Init. pinout
+  // pinMode(Boto, INPUT);
+  // if (enBoto != 99) pinMode(enBoto, OUTPUT), digitalWrite(enBoto, HIGH);
 
   // Init. digital led
   FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
@@ -533,14 +560,20 @@ void setup() {
 
   if(isMacValid(receiverMac)){  //strMac != "FF:FF:FF:FF:FF:FF"){
 
+    // config_ESPNOW();
+
+    // // set variables to sent
+    // strcpy(missatge.topic, "llum");
+    // strcpy(missatge.payload, "conmuta");
+    
+    // // Send message via ESP-NOW
+    // send_ESPNOW();
+
     config_ESPNOW();
 
-    // set variables to sent
-    strcpy(missatge.topic, "llum");
-    strcpy(missatge.payload, "conmuta");
-    
     // Send message via ESP-NOW
     send_ESPNOW();
+
   }else{
     Serial.println("No hi ha cap MAC del slave guardada");
     leds[0] = CRGB::Yellow;
