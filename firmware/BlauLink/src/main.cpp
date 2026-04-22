@@ -143,65 +143,10 @@ void readEeprom(){
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   _mac_delivery_ok = (status == ESP_NOW_SEND_SUCCESS);
   Serial.println(_mac_delivery_ok ? "MAC ACK: OK" : "MAC ACK: FAIL");
-  // ← res més: cap FastLED, cap delay, cap Serial llarg
-}
-
-void printPacket(const BlauPacket_t* pkt) {
-  Serial.println("---- PACKET ----");
-  Serial.printf("version: 0x%02X\n", pkt->version);
-  Serial.printf("type:    0x%02X\n", pkt->type);
-  Serial.printf("seq:     %d\n", pkt->seq);
-  Serial.printf("cmd:     0x%02X\n", pkt->cmd);
-  Serial.printf("p1:      0x%02X\n", pkt->p1);
-  Serial.printf("p2:      0x%02X\n", pkt->p2);
-  Serial.printf("p3:      0x%02X\n", pkt->p3);
-  Serial.printf("src_id:  0x%04X\n", pkt->src_id);
-  Serial.printf("crc:     0x%02X\n", pkt->crc8);
-  Serial.println("----------------");
 }
 
 void OnDataRecv(const uint8_t *mac, const uint8_t *data, int len) {
-  Serial.print("<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>");
-  Serial.print("len: ");
-  Serial.println(len);
-
-  for (int i = 0; i < len; i++) {
-    Serial.printf("%02X ", data[i]);
-  }
-  Serial.println();
-
-  if (!esp_now_is_peer_exist(mac)) {
-    esp_now_peer_info_t peerInfo = {};
-    memcpy(peerInfo.peer_addr, mac, 6);
-    peerInfo.channel = 0;
-    peerInfo.encrypt = false;
-    esp_now_add_peer(&peerInfo);
-  }
-
-
-  BlauPacket_t pkt;
-  if (!blau_parse_packet(data, len, &pkt)) {
-    Serial.print("blau_parse_packet FAIL, len="); Serial.println(len);
-    return;
-  }
-  printPacket(&pkt);   // ara sí: sobre dades vàlides
-
-  if (pkt.type == TYPE_ACK) {
-    // Per protocol: cmd=seq confirmat, p1=codi ACK_*
-    blau_ack_seq      = pkt.cmd;          // blau_is_ack_for() compara pkt.cmd
-    blau_ack_result   = pkt.p1;           // blau_ack_status() retorna pkt.p1
-    blau_ack_received = true;
-    Serial.print("ACK rebut! confirmed_seq="); Serial.print(pkt.cmd);
-    Serial.print(" status=0x"); Serial.println(pkt.p1, HEX);
-  } else if (pkt.type == TYPE_PONG) {
-    Serial.print("PONG rebut, seq="); Serial.println(pkt.seq);
-  } else if (pkt.type == TYPE_STATUS_RSP) {
-    Serial.print("STATUS_RSP: on="); Serial.print(pkt.p1);
-    Serial.print(" bri="); Serial.print(pkt.p2);
-    Serial.print(" type="); Serial.println(pkt.p3);
-  } else {
-    Serial.print("Paquet rebut, type=0x"); Serial.println(pkt.type, HEX);
-  }
+  blau_on_data_recv(mac, data, len, &blau_ack_received, &blau_ack_seq, &blau_ack_result);
 }
 
 void config_ESPNOW(){
@@ -233,35 +178,6 @@ void config_ESPNOW(){
   }
 }
 
-bool sendWithAck(BlauPacket_t *pkt) {
-  for (int attempt = 0; attempt < BLAU_MAX_RETRIES; attempt++) {
-    blau_ack_received = false;
-
-    if (esp_now_send(receiverMac, (uint8_t*)pkt, sizeof(BlauPacket_t)) != ESP_OK) {
-      Serial.print("esp_now_send error, intent="); Serial.println(attempt + 1);
-      continue;
-    }
-
-    uint32_t t0 = millis();
-    while (millis() - t0 < BLAU_ACK_TIMEOUT_MS) {
-      if (blau_ack_received && blau_ack_seq == pkt->seq) {
-        uint8_t st = blau_ack_result;   // blau_ack_status() equivalent (ja llegit)
-        if (st == ACK_OK || st == ACK_DUPLICATE) {
-          Serial.print("ACK acceptat (intent "); Serial.print(attempt + 1);
-          Serial.print(") status=0x"); Serial.println(st, HEX);
-          return true;
-        }
-        // ACK_ERROR o altres → reintent
-        Serial.print("ACK rebutjat, status=0x"); Serial.println(st, HEX);
-        break;   // surt del while, passa al següent intent
-      }
-      delay(1);  // ceda CPU però no bloqueja 50 ms sencers
-    }
-    Serial.print("Timeout/fail sense ACK acceptat, intent="); Serial.println(attempt + 1);
-  }
-  return false;
-}
-
 void send_ping() {
   BlauPacket_t pkt;
   blau_seq = millis() & 0xFF;
@@ -279,7 +195,7 @@ void send_ESPNOW(){
   blau_seq = millis() & 0xFF;
   blau_build_event_packet(&pkt, blau_seq, EVT_CLICK_1);
 
-  bool ok = sendWithAck(&pkt);
+  bool ok = blau_send_with_ack(&pkt, receiverMac, &blau_ack_received, &blau_ack_seq, &blau_ack_result);
   blau_seq = millis() & 0xFF;
 
   // LED al task principal: segur, sense interferir amb WiFi task
@@ -582,7 +498,9 @@ void setup() {
   if (enBoto != 99) pinMode(enBoto, OUTPUT), digitalWrite(enBoto, HIGH);
   
   Serial.begin(115200);     // Init. serial port
-  // delay(2000);
+  
+  delay(2000);
+  Serial.println(">> inici");
   
   EEPROM.begin(6);        // Init. eeprom memory (or 512)
   
@@ -595,9 +513,10 @@ void setup() {
   batteryLevel = calculateBatteryPercentage(batteryVoltage);
   isCharging = false;//isDeviceCharging(); // Función que debes implementar
 
-  // Serial.println("holaaaaaaaaaaaa");
-  Serial.println(batteryVoltage);
-  Serial.println(batteryLevel);
+  // Serial.print("batteryVoltage: ");
+  // Serial.println(batteryVoltage);
+  // Serial.print("batteryLevel: ");
+  // Serial.println(batteryLevel);
 
   // Init. digital led
   FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
