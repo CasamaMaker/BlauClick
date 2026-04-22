@@ -84,24 +84,13 @@ unsigned long startTime; // Variable per emmagatzemar el temps d'inici
 // Definir un array global per emmagatzemar les adreces MAC
 String macAddresses[MAX_NETWORKS];  // Array per emmagatzemar les adreces MAC de les xarxes trobades
 
-// #define CRYPTO_KEY "PASSWORD12345678"//"PASSWORD1"  // La mateixa clau de xifratge que en el dispositiu broker
-
-
-// // Structure data to send
-// typedef struct {
-//   // bool estat;
-//   char topic[50];
-//   char payload[50];
-// } struct_message;
-
-// // Create a struct_message called missatge
-// struct_message missatge;
 
 // BlauProtocol: comptador de seqüència (circular 0–255)
 // static uint8_t blau_seq = 0;
 static uint8_t          blau_seq          = 0;
 volatile bool           blau_ack_received = false; // escrit des del callback ESP-NOW
 volatile uint8_t        blau_ack_seq      = 0;     // seq confirmat per l'ACK rebut
+volatile uint8_t        blau_ack_result   = 0;     // codi ACK_* rebut (camp p1 de l'ACK)
 
 
 // flag llegit pel task principal — mai tocar FastLED des d'aquí
@@ -151,26 +140,6 @@ void readEeprom(){
   }
 }
 
-// callback when data is sent
-// void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
-//   Serial.print("\r\nLast Packet Send Status:\t");
-//   // Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
-//   // Serial.println(status);
-//   if(status == ESP_NOW_SEND_SUCCESS){
-//     Serial.println("Delivery Success" + status);
-//     leds[0] = CRGB::Green;
-//     FastLED.show();
-//     // leds[0] = CRGB::Green;
-//     // FastLED.show();
-//   }else{
-//     Serial.println("Delivery Fail" + status);
-//     leds[0] = CRGB::Red;
-//     FastLED.show();
-//     // leds[0] = CRGB::Red;
-//     // FastLED.show();
-//   }
-// }
-
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   _mac_delivery_ok = (status == ESP_NOW_SEND_SUCCESS);
   Serial.println(_mac_delivery_ok ? "MAC ACK: OK" : "MAC ACK: FAIL");
@@ -209,22 +178,6 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *data, int len) {
     esp_now_add_peer(&peerInfo);
   }
 
-  // BlauPacket_t pkt;
-  // printPacket(&pkt);
-  // if (!blau_parse_packet(data, len, &pkt)) return;
-  
-
-  // // if (pkt.type == TYPE_ACK) {
-  // //   blau_ack_seq      = pkt.cmd;   // pkt.cmd conté el seq confirmat (per protocol)
-  // //   blau_ack_received = true;
-  // // }
-  // if (pkt.type == TYPE_ACK) {
-  //   Serial.println("ACK rebut:");
-  //   // printPacket(&pkt);
-
-  //   blau_ack_seq = pkt.seq;   // IMPORTANT
-  //   blau_ack_received = true;
-  // }
 
   BlauPacket_t pkt;
   if (!blau_parse_packet(data, len, &pkt)) {
@@ -234,15 +187,22 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *data, int len) {
   printPacket(&pkt);   // ara sí: sobre dades vàlides
 
   if (pkt.type == TYPE_ACK) {
-    Serial.print("ACK rebut! seq="); Serial.println(pkt.seq);
-    blau_ack_seq      = pkt.seq;
+    // Per protocol: cmd=seq confirmat, p1=codi ACK_*
+    blau_ack_seq      = pkt.cmd;          // blau_is_ack_for() compara pkt.cmd
+    blau_ack_result   = pkt.p1;           // blau_ack_status() retorna pkt.p1
     blau_ack_received = true;
+    Serial.print("ACK rebut! confirmed_seq="); Serial.print(pkt.cmd);
+    Serial.print(" status=0x"); Serial.println(pkt.p1, HEX);
+  } else if (pkt.type == TYPE_PONG) {
+    Serial.print("PONG rebut, seq="); Serial.println(pkt.seq);
+  } else if (pkt.type == TYPE_STATUS_RSP) {
+    Serial.print("STATUS_RSP: on="); Serial.print(pkt.p1);
+    Serial.print(" bri="); Serial.print(pkt.p2);
+    Serial.print(" type="); Serial.println(pkt.p3);
   } else {
     Serial.print("Paquet rebut, type=0x"); Serial.println(pkt.type, HEX);
   }
 }
-
-
 
 void config_ESPNOW(){
   
@@ -273,50 +233,9 @@ void config_ESPNOW(){
   }
 }
 
-// void send_ESPNOW(){
-//   Serial.print("----->");
-//   strMac = macToString(receiverMac);
-
-//   Serial.println(strMac);
-//   Serial.print(missatge.topic);
-//   Serial.println(missatge.payload);
-
-//   esp_err_t result = esp_now_send(receiverMac, (uint8_t *) &missatge, sizeof(missatge));  //broadcastAddress, (uint8_t *) &missatge, sizeof(missatge));
-  
-//   // char macStr[18];
-//   // snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
-//   //          receiverMac[0], receiverMac[1], receiverMac[2],
-//   //          receiverMac[3], receiverMac[4], receiverMac[5]);
-
-//   // Serial.print("--");
-//   // Serial.println(macStr);
-
-//   if (result != ESP_OK) {
-//     Serial.println("Error al enviar el dato");
-//   }else{
-//     Serial.println("Enviament correcte");
-//   }
-// }
-
-// void send_ESPNOW(){
-//   BlauPacket_t pkt;
-//   blau_build_event_packet(&pkt, blau_seq, EVT_CLICK_1);
-//   blau_seq++;
-
-//   Serial.print("Enviant BlauPacket seq="); Serial.println(pkt.seq);
-
-//   esp_err_t result = esp_now_send(receiverMac, (uint8_t*)&pkt, sizeof(pkt));
-
-//   if (result != ESP_OK) {
-//     Serial.println("Error al enviar el paquet");
-//   } else {
-//     Serial.println("Paquet enviat correctament");
-//   }
-// }
-
 bool sendWithAck(BlauPacket_t *pkt) {
   for (int attempt = 0; attempt < BLAU_MAX_RETRIES; attempt++) {
-    blau_ack_received = false;   // reset abans de cada intent
+    blau_ack_received = false;
 
     if (esp_now_send(receiverMac, (uint8_t*)pkt, sizeof(BlauPacket_t)) != ESP_OK) {
       Serial.print("esp_now_send error, intent="); Serial.println(attempt + 1);
@@ -326,27 +245,34 @@ bool sendWithAck(BlauPacket_t *pkt) {
     uint32_t t0 = millis();
     while (millis() - t0 < BLAU_ACK_TIMEOUT_MS) {
       if (blau_ack_received && blau_ack_seq == pkt->seq) {
-        Serial.print("ACK rebut (intent "); Serial.print(attempt + 1); Serial.println(")");
-        return true;
+        uint8_t st = blau_ack_result;   // blau_ack_status() equivalent (ja llegit)
+        if (st == ACK_OK || st == ACK_DUPLICATE) {
+          Serial.print("ACK acceptat (intent "); Serial.print(attempt + 1);
+          Serial.print(") status=0x"); Serial.println(st, HEX);
+          return true;
+        }
+        // ACK_ERROR o altres → reintent
+        Serial.print("ACK rebutjat, status=0x"); Serial.println(st, HEX);
+        break;   // surt del while, passa al següent intent
       }
-      delay(50);
+      delay(1);  // ceda CPU però no bloqueja 50 ms sencers
     }
-    Serial.print("Timeout sense ACK, intent="); Serial.println(attempt + 1);
+    Serial.print("Timeout/fail sense ACK acceptat, intent="); Serial.println(attempt + 1);
   }
   return false;
 }
 
-// void send_ESPNOW(){
-//   BlauPacket_t pkt;
-//   blau_seq = millis() & 0xFF;
-//   blau_build_event_packet(&pkt, blau_seq, EVT_CLICK_1);
+void send_ping() {
+  BlauPacket_t pkt;
+  blau_seq = millis() & 0xFF;
+  blau_build_ping_packet(&pkt, blau_seq);
 
-//   bool ok = sendWithAck(&pkt);
-//   // blau_seq++;   // incrementa sempre: el seq no es repeteix mai entre events distints
-//   blau_seq = millis() & 0xFF;
-
-//   if (!ok) Serial.println("WARN: sense ACK després de tots els intents");
-// }
+  blau_ack_received = false;
+  esp_err_t r = esp_now_send(receiverMac, (uint8_t*)&pkt, sizeof(pkt));
+  Serial.print("PING enviat seq="); Serial.print(pkt.seq);
+  Serial.print(" err=0x"); Serial.println(r, HEX);
+  // La resposta (PONG) es processarà a OnDataRecv — no bloqueja
+}
 
 void send_ESPNOW(){
   BlauPacket_t pkt;
@@ -357,8 +283,8 @@ void send_ESPNOW(){
   blau_seq = millis() & 0xFF;
 
   // LED al task principal: segur, sense interferir amb WiFi task
-  // leds[0] = ok ? CRGB::Green : CRGB::Red;
-  // FastLED.show();
+  leds[0] = ok ? CRGB::Green : CRGB::Red;
+  FastLED.show();
 
   if (!ok) Serial.println("WARN: sense ACK després de tots els intents");
 }
@@ -656,7 +582,7 @@ void setup() {
   if (enBoto != 99) pinMode(enBoto, OUTPUT), digitalWrite(enBoto, HIGH);
   
   Serial.begin(115200);     // Init. serial port
-  delay(2000);
+  // delay(2000);
   
   EEPROM.begin(6);        // Init. eeprom memory (or 512)
   
@@ -664,11 +590,6 @@ void setup() {
   if (!LittleFS.begin()) return Serial.println("Error muntant LittleFS"), void();   // Init. file system
 
   readEeprom();
-
-
-  // Serial.println(strMac);
-  // getBatteryVoltage();
-
 
   batteryVoltage = getBatteryVoltage(); // Función que debes implementar
   batteryLevel = calculateBatteryPercentage(batteryVoltage);
@@ -678,11 +599,6 @@ void setup() {
   Serial.println(batteryVoltage);
   Serial.println(batteryLevel);
 
-
-  // // Init. pinout
-  // pinMode(Boto, INPUT);
-  // if (enBoto != 99) pinMode(enBoto, OUTPUT), digitalWrite(enBoto, HIGH);
-
   // Init. digital led
   FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
   leds[0] = CRGB::Black;
@@ -690,16 +606,6 @@ void setup() {
 
 
   if(isMacValid(receiverMac)){  //strMac != "FF:FF:FF:FF:FF:FF"){
-
-    // config_ESPNOW();
-
-    // // set variables to sent
-    // strcpy(missatge.topic, "llum");
-    // strcpy(missatge.payload, "conmuta");
-    
-    // // Send message via ESP-NOW
-    // send_ESPNOW();
-
     config_ESPNOW();
 
     // Send message via ESP-NOW
@@ -712,7 +618,6 @@ void setup() {
   }
 
   delay(10);
-
 }
 
 void loop() {
@@ -728,7 +633,6 @@ void loop() {
     }
   }
 
-
   if(startTime + 3000 < millis()){
 
     Serial.print("MAC guardada:  "); Serial.println(strMac);
@@ -738,8 +642,6 @@ void loop() {
 
     wifiApModeServer();
 
-
-    
     bool buttonStateLow1=false;
     bool buttonStateHigh2=false;
     bool buttonReleased = false;
