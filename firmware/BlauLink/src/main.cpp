@@ -14,6 +14,7 @@
 #include "DNSServer.h"
 
 #include <esp_sleep.h>
+#include <esp_wifi.h>
 #include <EEPROM.h>
 #include <esp_now.h>
 #include <FastLED.h>
@@ -149,28 +150,65 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *data, int len) {
   blau_on_data_recv(mac, data, len, &blau_ack_received, &blau_ack_seq, &blau_ack_result);
 }
 
-void config_ESPNOW(){
-  
+// ── Canal cache (EEPROM byte 6) ──────────────────────────────────
+// BlauTrigger's radio may be locked to the router's channel (ESP32-C3 single-radio).
+// We cache the discovered channel so subsequent presses skip the scan.
+
+uint8_t getCachedChannel() {
+  uint8_t ch = EEPROM.read(6);
+  return (ch >= 1 && ch <= 13) ? ch : 0;  // 0 = no valid cache
+}
+
+void setCachedChannel(uint8_t ch) {
+  if (ch >= 1 && ch <= 13 && EEPROM.read(6) != ch) {
+    EEPROM.write(6, ch);
+    EEPROM.commit();
+    Serial.printf("Canal guardat a EEPROM: %d\n", ch);
+  }
+}
+
+// Scan for the BlauTrigger AP and return its channel (1 if not found)
+uint8_t findBlauTriggerChannel() {
+  Serial.println("Escanejant canal de BlauTrigger...");
   WiFi.mode(WIFI_STA);
-  
+  int n = WiFi.scanNetworks(false, false, false, 500);
+  uint8_t ch = 1;  // fallback
+  for (int i = 0; i < n; i++) {
+    if (WiFi.SSID(i).startsWith("BlauTrigger")) {
+      ch = (uint8_t)WiFi.channel(i);
+      Serial.printf("BlauTrigger trobat '%s' al canal %d\n", WiFi.SSID(i).c_str(), ch);
+      break;
+    }
+  }
+  WiFi.scanDelete();
+  return ch;
+}
+
+void config_ESPNOW(uint8_t channel) {
+  WiFi.mode(WIFI_STA);
+  Serial.printf("Configurant ESP-NOW al canal %d\n", channel);
+
+  // Switch our radio to the target channel before init — required by ESP-NOW
+  // (BlauLink is in STA mode, not connected, so channel switch is free)
+  esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
+
   // Init ESP-NOW
   if (esp_now_init() != ESP_OK) {
     Serial.println("Error initializing ESP-NOW");
     return;
   }
 
-
   // Once ESPNow is successfully Init, we will register for Send CB to
   // get the status of Trasnmitted packet
   esp_now_register_send_cb(OnDataSent);
   esp_now_register_recv_cb(OnDataRecv);
-  
+
   // Registrar el dispositivo receptor
   esp_now_peer_info_t peerInfo = {};
   memcpy(peerInfo.peer_addr, receiverMac, 6); //broadcastAddress, 6);
-  peerInfo.channel = 0;  
+  peerInfo.channel = 0;  // 0 = use current radio channel (already switched above)
   peerInfo.encrypt = false;
-  
+
   // Añadir el receptor
   if (esp_now_add_peer(&peerInfo) != ESP_OK){
     Serial.println("Failed to add peer");
@@ -190,7 +228,7 @@ void send_ping() {
   // La resposta (PONG) es processarà a OnDataRecv — no bloqueja
 }
 
-void send_ESPNOW(){
+bool send_ESPNOW(){
   BlauPacket_t pkt;
   blau_seq = millis() & 0xFF;
   blau_build_event_packet(&pkt, blau_seq, EVT_CLICK_1);
@@ -203,6 +241,7 @@ void send_ESPNOW(){
   FastLED.show();
 
   if (!ok) Serial.println("WARN: sense ACK després de tots els intents");
+  return ok;
 }
 
 String* scanNetworks() {
@@ -499,10 +538,10 @@ void setup() {
   
   Serial.begin(115200);     // Init. serial port
   
-  delay(2000);
+  // delay(2000);
   Serial.println(">> inici");
   
-  EEPROM.begin(6);        // Init. eeprom memory (or 512)
+  EEPROM.begin(7);        // Init. eeprom memory: 6 bytes MAC + 1 byte canal cache
   
 
   if (!LittleFS.begin()) return Serial.println("Error muntant LittleFS"), void();   // Init. file system
@@ -525,10 +564,23 @@ void setup() {
 
 
   if(isMacValid(receiverMac)){  //strMac != "FF:FF:FF:FF:FF:FF"){
-    config_ESPNOW();
+    // Use cached channel to skip the scan on repeated presses
+    uint8_t ch = getCachedChannel();
+    if (ch == 0) {
+      ch = findBlauTriggerChannel();  // first use or cache invalidated
+      setCachedChannel(ch);
+    } else {
+      Serial.printf("Usant canal en caché: %d (sense scan)\n", ch);
+    }
 
-    // Send message via ESP-NOW
-    send_ESPNOW();
+    config_ESPNOW(ch);
+    bool ok = send_ESPNOW();
+
+    if (!ok) {
+      // Channel may have changed — update cache for next press
+      uint8_t newCh = findBlauTriggerChannel();
+      setCachedChannel(newCh);
+    }
 
   }else{
     Serial.println("No hi ha cap MAC del slave guardada");
