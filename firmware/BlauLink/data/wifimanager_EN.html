@@ -76,11 +76,13 @@
             if (macParts.length > 1) {
               macDiv.innerText = macParts[1];
               macDiv.setAttribute('data-mac', macParts[0]);
+              macDiv.setAttribute('data-ssid', macParts[1]);
             } else {
               macDiv.innerText = mac;
               macDiv.setAttribute('data-mac', mac);
+              macDiv.setAttribute('data-ssid', "");
             }
-            macDiv.onclick = function() { setMac(this.getAttribute('data-mac')); };
+            macDiv.onclick = function() { setMac(this.getAttribute('data-mac'), this.getAttribute('data-ssid')); };
             macListContainer.appendChild(macDiv);
           });
         }
@@ -89,8 +91,9 @@
       xhttp.send();
     }
 
-    function setMac(mac) {
+    function setMac(mac, ssid) {
       document.getElementById("mac").value = mac;
+      document.getElementById("ssid").value = ssid || "";
     }
 
     function refreshDevices() {
@@ -290,6 +293,7 @@
       <form action="/" method="POST">
         <label for="mac">New slave MAC address</label>
         <input type="text" id="mac" name="mac" placeholder="XX:XX:XX:XX:XX:XX" maxlength="17" pattern="([A-Fa-f0-9]{2}:){5}[A-Fa-f0-9]{2}" title="Formato requerido: XX:XX:XX:XX:XX:XX" oninput="formatMAC(this)"/>
+        <input type="hidden" id="ssid" name="ssid" value="" />
         <input type="submit" value="Save" />
       </form>
     </div>

@@ -36,6 +36,7 @@ const char* PARAM_INPUT_1 = "mac";
 String strMac;
 char macStr[18];
 byte receiverMac[6];
+String receiverSSID = "";
 
 String myAddresss, myAddresssDoted, myAddresssEnd;
 
@@ -103,14 +104,18 @@ void readAllConfigs() {
   memset(receiverMac, 0xFF, 6);
   prefs.begin("blau", true);
   size_t n = prefs.getBytes("mac", receiverMac, 6);
+  receiverSSID = prefs.getString("ssid", "");
   prefs.end();
 
   if (n == 6 && isMacValid(receiverMac)) {
     strMac = macToString(receiverMac);
     Serial.printf("[NVS] MAC llegida: %s\n", strMac.c_str());
+    if (receiverSSID.length() > 0)
+      Serial.printf("[NVS] SSID llegit: %s\n", receiverSSID.c_str());
   } else {
     memset(receiverMac, 0xFF, 6);
     strMac = "FF:FF:FF:FF:FF:FF";
+    receiverSSID = "";
     Serial.println("[NVS] Cap MAC guardada");
   }
 }
@@ -122,14 +127,23 @@ void saveMac() {
   Serial.printf("[NVS] MAC guardada: %s\n", strMac.c_str());
 }
 
+void saveSSID() {
+  prefs.begin("blau", false);
+  prefs.putString("ssid", receiverSSID);
+  prefs.end();
+  Serial.printf("[NVS] SSID guardat: %s\n", receiverSSID.c_str());
+}
+
 void deleteMac() {
   memset(receiverMac, 0xFF, 6);
   strMac = "FF:FF:FF:FF:FF:FF";
+  receiverSSID = "";
   prefs.begin("blau", false);
   prefs.remove("mac");
   prefs.remove("ch");
+  prefs.remove("ssid");
   prefs.end();
-  Serial.println("[NVS] MAC i canal esborrats");
+  Serial.println("[NVS] MAC, canal i SSID esborrats");
 }
 
 uint8_t getCachedChannel() {
@@ -183,18 +197,37 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *data, int len) {
 }
 
 uint8_t findBlauTriggerChannel() {
-  Serial.println("[ESPNOW] Escanejant canal de BlauTrigger...");
+  Serial.println("[ESPNOW] Escanejant canal...");
+  if (receiverSSID.length() > 0)
+    Serial.printf("[ESPNOW] Cercant SSID configurat: '%s'\n", receiverSSID.c_str());
+  else
+    Serial.println("[ESPNOW] Cercant prefix 'BlauTrigger' (cap SSID configurat)");
+
   WiFi.mode(WIFI_STA);
   int n = WiFi.scanNetworks(false, false, false, 500);
-  uint8_t ch = 1;
+  Serial.printf("[ESPNOW] Xarxes trobades: %d\n", n);
+
+  uint8_t ch = 0;
   for (int i = 0; i < n; i++) {
-    if (WiFi.SSID(i).startsWith("BlauTrigger")) {
-      ch = (uint8_t)WiFi.channel(i);
-      Serial.printf("[ESPNOW] BlauTrigger trobat '%s' al canal %d\n", WiFi.SSID(i).c_str(), ch);
-      break;
+    String ssid = WiFi.SSID(i);
+    uint8_t netCh = (uint8_t)WiFi.channel(i);
+    Serial.printf("[ESPNOW]  [%d] '%s' ch=%d MAC=%s\n", i, ssid.c_str(), netCh, WiFi.BSSIDstr(i).c_str());
+
+    bool match = (receiverSSID.length() > 0)
+      ? (ssid == receiverSSID)
+      : ssid.startsWith("BlauTrigger");
+
+    if (match && ch == 0) {
+      ch = netCh;
+      Serial.printf("[ESPNOW] >>> Coincidencia: '%s' al canal %d\n", ssid.c_str(), ch);
     }
   }
   WiFi.scanDelete();
+
+  if (ch == 0) {
+    ch = 1;
+    Serial.printf("[ESPNOW] WARN: SSID no trobat, canal per defecte: %d\n", ch);
+  }
   return ch;
 }
 
@@ -416,6 +449,13 @@ void webServerSetup() {
             strMac = macToString(receiverMac);
             saveMac();
           }
+        }
+        if (p->isPost() && p->name() == "ssid") {
+          receiverSSID = p->value();
+          saveSSID();
+          prefs.begin("blau", false);
+          prefs.remove("ch");
+          prefs.end();
         }
       }
     #endif
