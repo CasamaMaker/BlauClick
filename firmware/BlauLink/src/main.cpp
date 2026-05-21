@@ -3,11 +3,12 @@
  * https://github.com/CasamaMaker/BlauLink
  */
 
-
 #include <Arduino.h>
 #include <WiFi.h>
 #include <FS.h>
 #include <LittleFS.h>
+
+#include "config.h"
 
 #include <AsyncTCP.h>
 #include "ESPAsyncWebServer.h"
@@ -15,95 +16,58 @@
 
 #include <esp_sleep.h>
 #include <esp_wifi.h>
-#include <EEPROM.h>
+#include <Preferences.h>
 #include <esp_now.h>
-#include <FastLED.h>
+#include <Adafruit_NeoPixel.h>
 #include "blauprotocol.h"
 #include "blauprotocol_link.h"
 #include "blauprotocol_trg.h"
 
 
+// ── LED ──────────────────────────────────────────────────────────
+Adafruit_NeoPixel strip(NUM_LEDS, PIN_LED, NEO_GRB + NEO_KHZ800);
 
-// #define BLAULINK_V1
-#define BLAULINK_V2
-// #define PICO_CLICK
+// ── Web server / DNS ─────────────────────────────────────────────
+AsyncWebServer server(HTTP_PORT);
+DNSServer dnsServer;
 
-
-#if defined(BLAULINK_V1)
-  #define enVBatterySense 4
-  #define VbatSense 3
-  #define Boto 5
-  #define enBoto 99  // 99 per indicar no disponible o mode deepsleep
-  #define digitalLed 6
-
-#elif defined(BLAULINK_V2)
-  #define enVBatterySense 0
-  #define VbatSense 3
-  #define Boto 1
-  #define enBoto 4
-  #define digitalLed 5
-
-#elif defined(PICO_CLICK)
-  #define enVBatterySense 99  // No implementat
-  #define VbatSense 4
-  #define Boto 5
-  #define enBoto 3
-  #define digitalLed 6
-
-#else
-  #error "Defineix una versió del dispositiu (BLAULINK_V1, BLAULINK_V2 o PICO_CLICK)"
-#endif
-
-#define idioma  "CAT"      // CAT:català (per defecte), EN:english
-
-const char* ssid = "BlauLink"; //Name of the WIFI network hosted by the device
-const char* password =  "";               //Password
-
-AsyncWebServer server(80);                //This creates a web server, required in order to host a page for connected devices
-
-DNSServer dnsServer;                      //This creates a DNS server, required for the captive portal
-
-const char* PARAM_INPUT_1 = "mac";  // Search for parameter in HTTP POST request
-String strMac;  
-char macStr[18];  
-byte receiverMac[6];                   //Variables to save values from HTML form
-const char* macPath = "/mac.txt"; // File paths to save input values permanently
+// ── MAC target ───────────────────────────────────────────────────
+const char* PARAM_INPUT_1 = "mac";
+String strMac;
+char macStr[18];
+byte receiverMac[6];
 
 String myAddresss, myAddresssDoted, myAddresssEnd;
 
-//****************** DIGITAL LED ******************************
-// #include <FastLED.h>
-#define NUM_LEDS 1
-#define DATA_PIN digitalLed //6
-#define BRIGHTNESS  15
-CRGB leds[NUM_LEDS];
+#define MAX_NETWORKS 5
+String macAddresses[MAX_NETWORKS];
 
-unsigned long startTime; // Variable per emmagatzemar el temps d'inici
+// ── Seqüències ESP-NOW ───────────────────────────────────────────
+static uint8_t       blau_seq          = 0;
+volatile bool        blau_ack_received = false;
+volatile uint8_t     blau_ack_seq      = 0;
+volatile uint8_t     blau_ack_result   = 0;
+static volatile bool _mac_delivery_ok  = false;
 
-#define MAX_NETWORKS 5  // Definir un límit per al nombre de xarxes que podem guardar
-
-// Definir un array global per emmagatzemar les adreces MAC
-String macAddresses[MAX_NETWORKS];  // Array per emmagatzemar les adreces MAC de les xarxes trobades
-
-
-// BlauProtocol: comptador de seqüència (circular 0–255)
-// static uint8_t blau_seq = 0;
-static uint8_t          blau_seq          = 0;
-volatile bool           blau_ack_received = false; // escrit des del callback ESP-NOW
-volatile uint8_t        blau_ack_seq      = 0;     // seq confirmat per l'ACK rebut
-volatile uint8_t        blau_ack_result   = 0;     // codi ACK_* rebut (camp p1 de l'ACK)
-
-
-// flag llegit pel task principal — mai tocar FastLED des d'aquí
-static volatile bool _mac_delivery_ok = false;
-
+// ── ADC i bateria ────────────────────────────────────────────────
 #include "esp_adc_cal.h"
-
 esp_adc_cal_characteristics_t adc_chars;
-
 float batteryVoltage;
-int batteryLevel;
-bool isCharging;
+int   batteryLevel;
+bool  isCharging;
+
+// ── Timer ────────────────────────────────────────────────────────
+unsigned long startTime;
+
+// ── Preferences (NVS) ───────────────────────────────────────────
+#ifndef HARDCODED_CONFIG
+Preferences prefs;
+#endif
+
+
+// ════════════════════════════════════════════════════════════════
+//  UTILITATS
+// ════════════════════════════════════════════════════════════════
 
 bool isMacValid(const uint8_t* mac) {
   for (int i = 0; i < 6; i++) {
@@ -113,70 +77,120 @@ bool isMacValid(const uint8_t* mac) {
 }
 
 String macToString(const uint8_t *mac) {
-  char buf[18];  // Buffer estàtic per mantenir la cadena després de sortir de la funció
+  char buf[18];
   sprintf(buf, "%02X:%02X:%02X:%02X:%02X:%02X",
           mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
   String s(buf);
-  s.toUpperCase();   // Això modifica 's' i no retorna res
+  s.toUpperCase();
   return s;
 }
 
-void deleteEeprom(){
-  // Delete 6 bytes of eeprom
-  memset(receiverMac, 0xFF, sizeof(receiverMac));
-  EEPROM.put(0, receiverMac);
-  EEPROM.commit();
+
+// ════════════════════════════════════════════════════════════════
+//  GESTIÓ DE CONFIGURACIÓ (NVS / Preferences)
+// ════════════════════════════════════════════════════════════════
+
+#ifndef HARDCODED_CONFIG
+
+void clearConfig() {
+  prefs.begin("blau", false);
+  prefs.clear();
+  prefs.end();
+  Serial.println("[NVS] Config esborrada");
 }
 
-void readEeprom(){
-  EEPROM.get(0, receiverMac);   // Get MAC address saved in eeprom
-  // Serial.println("read");
-  // strMac = macToString(receiverMac);
+void readAllConfigs() {
+  memset(receiverMac, 0xFF, 6);
+  prefs.begin("blau", true);
+  size_t n = prefs.getBytes("mac", receiverMac, 6);
+  prefs.end();
 
-  if (isMacValid(receiverMac)) {
+  if (n == 6 && isMacValid(receiverMac)) {
     strMac = macToString(receiverMac);
+    Serial.printf("[NVS] MAC llegida: %s\n", strMac.c_str());
   } else {
-    Serial.println("No hi ha cap MAC guardada");
-    strMac = "FF:FF:FF:FF:FF:FF"; // O posa una cadena indicativa
+    memset(receiverMac, 0xFF, 6);
+    strMac = "FF:FF:FF:FF:FF:FF";
+    Serial.println("[NVS] Cap MAC guardada");
   }
 }
 
+void saveMac() {
+  prefs.begin("blau", false);
+  prefs.putBytes("mac", receiverMac, 6);
+  prefs.end();
+  Serial.printf("[NVS] MAC guardada: %s\n", strMac.c_str());
+}
+
+void deleteMac() {
+  memset(receiverMac, 0xFF, 6);
+  strMac = "FF:FF:FF:FF:FF:FF";
+  prefs.begin("blau", false);
+  prefs.remove("mac");
+  prefs.remove("ch");
+  prefs.end();
+  Serial.println("[NVS] MAC i canal esborrats");
+}
+
+uint8_t getCachedChannel() {
+  prefs.begin("blau", true);
+  uint8_t ch = prefs.getUChar("ch", 0);
+  prefs.end();
+  return (ch >= 1 && ch <= 13) ? ch : 0;
+}
+
+void setCachedChannel(uint8_t ch) {
+  if (ch >= 1 && ch <= 13) {
+    prefs.begin("blau", true);
+    uint8_t stored = prefs.getUChar("ch", 0);
+    prefs.end();
+    if (stored != ch) {
+      prefs.begin("blau", false);
+      prefs.putUChar("ch", ch);
+      prefs.end();
+      Serial.printf("[NVS] Canal guardat: %d\n", ch);
+    }
+  }
+}
+
+#else
+
+// Mode HARDCODED: MAC i canal venen de config.h, NVS no s'usa
+void readAllConfigs() {
+  uint8_t hcMac[] = HC_TARGET_MAC;
+  memcpy(receiverMac, hcMac, 6);
+  strMac = macToString(receiverMac);
+  Serial.printf("[HARDCODED] MAC: %s  canal: %d\n", strMac.c_str(), HC_CHANNEL);
+}
+
+uint8_t getCachedChannel() { return HC_CHANNEL; }
+void setCachedChannel(uint8_t) {}
+
+#endif
+
+
+// ════════════════════════════════════════════════════════════════
+//  ESP-NOW
+// ════════════════════════════════════════════════════════════════
+
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   _mac_delivery_ok = (status == ESP_NOW_SEND_SUCCESS);
-  Serial.println(_mac_delivery_ok ? "MAC ACK: OK" : "MAC ACK: FAIL");
+  Serial.println(_mac_delivery_ok ? "[ESPNOW] ACK TX: OK" : "[ESPNOW] ACK TX: FAIL");
 }
 
 void OnDataRecv(const uint8_t *mac, const uint8_t *data, int len) {
   blau_on_data_recv(mac, data, len, &blau_ack_received, &blau_ack_seq, &blau_ack_result);
 }
 
-// ── Canal cache (EEPROM byte 6) ──────────────────────────────────
-// BlauTrigger's radio may be locked to the router's channel (ESP32-C3 single-radio).
-// We cache the discovered channel so subsequent presses skip the scan.
-
-uint8_t getCachedChannel() {
-  uint8_t ch = EEPROM.read(6);
-  return (ch >= 1 && ch <= 13) ? ch : 0;  // 0 = no valid cache
-}
-
-void setCachedChannel(uint8_t ch) {
-  if (ch >= 1 && ch <= 13 && EEPROM.read(6) != ch) {
-    EEPROM.write(6, ch);
-    EEPROM.commit();
-    Serial.printf("Canal guardat a EEPROM: %d\n", ch);
-  }
-}
-
-// Scan for the BlauTrigger AP and return its channel (1 if not found)
 uint8_t findBlauTriggerChannel() {
-  Serial.println("Escanejant canal de BlauTrigger...");
+  Serial.println("[ESPNOW] Escanejant canal de BlauTrigger...");
   WiFi.mode(WIFI_STA);
   int n = WiFi.scanNetworks(false, false, false, 500);
-  uint8_t ch = 1;  // fallback
+  uint8_t ch = 1;
   for (int i = 0; i < n; i++) {
     if (WiFi.SSID(i).startsWith("BlauTrigger")) {
       ch = (uint8_t)WiFi.channel(i);
-      Serial.printf("BlauTrigger trobat '%s' al canal %d\n", WiFi.SSID(i).c_str(), ch);
+      Serial.printf("[ESPNOW] BlauTrigger trobat '%s' al canal %d\n", WiFi.SSID(i).c_str(), ch);
       break;
     }
   }
@@ -186,33 +200,23 @@ uint8_t findBlauTriggerChannel() {
 
 void config_ESPNOW(uint8_t channel) {
   WiFi.mode(WIFI_STA);
-  Serial.printf("Configurant ESP-NOW al canal %d\n", channel);
-
-  // Switch our radio to the target channel before init — required by ESP-NOW
-  // (BlauLink is in STA mode, not connected, so channel switch is free)
+  Serial.printf("[ESPNOW] Configurant al canal %d\n", channel);
   esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
 
-  // Init ESP-NOW
   if (esp_now_init() != ESP_OK) {
-    Serial.println("Error initializing ESP-NOW");
+    Serial.println("[ESPNOW] Error initializing");
     return;
   }
-
-  // Once ESPNow is successfully Init, we will register for Send CB to
-  // get the status of Trasnmitted packet
   esp_now_register_send_cb(OnDataSent);
   esp_now_register_recv_cb(OnDataRecv);
 
-  // Registrar el dispositivo receptor
   esp_now_peer_info_t peerInfo = {};
-  memcpy(peerInfo.peer_addr, receiverMac, 6); //broadcastAddress, 6);
-  peerInfo.channel = 0;  // 0 = use current radio channel (already switched above)
+  memcpy(peerInfo.peer_addr, receiverMac, 6);
+  peerInfo.channel = 0;
   peerInfo.encrypt = false;
 
-  // Añadir el receptor
-  if (esp_now_add_peer(&peerInfo) != ESP_OK){
-    Serial.println("Failed to add peer");
-    return;
+  if (esp_now_add_peer(&peerInfo) != ESP_OK) {
+    Serial.println("[ESPNOW] Failed to add peer");
   }
 }
 
@@ -220,442 +224,404 @@ void send_ping() {
   BlauPacket_t pkt;
   blau_seq = millis() & 0xFF;
   blau_build_ping_packet(&pkt, blau_seq);
-
   blau_ack_received = false;
   esp_err_t r = esp_now_send(receiverMac, (uint8_t*)&pkt, sizeof(pkt));
-  Serial.print("PING enviat seq="); Serial.print(pkt.seq);
-  Serial.print(" err=0x"); Serial.println(r, HEX);
-  // La resposta (PONG) es processarà a OnDataRecv — no bloqueja
+  Serial.printf("[ESPNOW] PING enviat seq=%d err=0x%X\n", pkt.seq, r);
 }
 
-bool send_ESPNOW(){
+bool send_ESPNOW() {
   BlauPacket_t pkt;
   blau_seq = millis() & 0xFF;
-  blau_build_event_packet(&pkt, blau_seq, EVT_CLICK_1);
+  // blau_build_event_packet(&pkt, blau_seq, EVT_CLICK_1);
+  blau_build_cmd_packet(&pkt, blau_seq, CMD_TOGGLE, 0,0,0);
+  // blau_build_cmd_packet(&pkt, blau_seq, CMD_SET_RGB, 255,0,0);
 
   bool ok = blau_send_with_ack(&pkt, receiverMac, &blau_ack_received, &blau_ack_seq, &blau_ack_result);
   blau_seq = millis() & 0xFF;
 
-  // LED al task principal: segur, sense interferir amb WiFi task
-  leds[0] = ok ? CRGB::Green : CRGB::Red;
-  FastLED.show();
+  strip.setPixelColor(0, ok ? COLOR_ESPNOW_OK : COLOR_ESPNOW_FAIL);
+  strip.show();
 
-  if (!ok) Serial.println("WARN: sense ACK després de tots els intents");
+  if (!ok) Serial.println("[ESPNOW] WARN: sense ACK després de tots els intents");
   return ok;
 }
 
-String* scanNetworks() {
-  Serial.println("scanning networks");
-  int n = WiFi.scanNetworks();  // Escaneja les xarxes Wi-Fi disponibles
-  int count = 0;  // Comptador per emmagatzemar les adreces MAC trobades
 
-  // Reinicialitza el contingut
-  for (int i = 0; i < MAX_NETWORKS; i++) {
-    macAddresses[i] = "";
+// ════════════════════════════════════════════════════════════════
+//  BATERIA
+// ════════════════════════════════════════════════════════════════
+
+float getBatteryVoltage() {
+  if (PIN_EN_VBAT != PIN_UNUSED) {
+    pinMode(PIN_EN_VBAT, OUTPUT);
+    digitalWrite(PIN_EN_VBAT, LOW);
   }
 
-  if (n == 0) {
-    Serial.println("No s'han trobat xarxes.");
-  } else {
-    for (int i = 0; i < n && count < MAX_NETWORKS; i++) {
-      // Emmagatzema l'adreça MAC de la xarxa al nostre array
-      macAddresses[count] = WiFi.BSSIDstr(i)+" >> "+ WiFi.SSID(i);  // Guarda l'adreça MAC
-      count++;
+  const float voltageDividerRatio = 2.0;
+  static esp_adc_cal_characteristics_t adc_chars_local;
+  esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_12, ADC_WIDTH_BIT_12,
+                           ESP_ADC_CAL_VAL_EFUSE_VREF, &adc_chars_local);
+
+  uint32_t sum_mV = 0;
+  for (int i = 0; i < BATTERY_SAMPLES; i++) {
+    uint32_t raw = analogRead(PIN_VBAT);
+    sum_mV += esp_adc_cal_raw_to_voltage(raw, &adc_chars_local);
+    delay(2);
+  }
+  return (sum_mV / BATTERY_SAMPLES * voltageDividerRatio) / 1000.0;
+}
+
+int calculateBatteryPercentage(float voltage) {
+  const float minV = BATTERY_MIN_MV / 1000.0f;
+  const float maxV = BATTERY_MAX_MV / 1000.0f;
+  if (voltage >= maxV) return 100;
+  if (voltage <= minV) return 0;
+  return constrain((int)((voltage - minV) / (maxV - minV) * 100), 0, 100);
+}
+
+bool isDeviceCharging() {
+  if (PIN_CHARGE == PIN_UNUSED) return false;
+  return digitalRead(PIN_CHARGE) == HIGH;
+}
+
+
+// ════════════════════════════════════════════════════════════════
+//  XARXES (escaneig per al portal)
+// ════════════════════════════════════════════════════════════════
+
+String* scanNetworks() {
+  Serial.println("[WIFI] Escanejant xarxes...");
+  int n = WiFi.scanNetworks();
+  for (int i = 0; i < MAX_NETWORKS; i++) macAddresses[i] = "";
+  if (n > 0) {
+    for (int i = 0; i < n && i < MAX_NETWORKS; i++) {
+      macAddresses[i] = WiFi.BSSIDstr(i) + " >> " + WiFi.SSID(i);
     }
   }
-
-  // Retorna l'array amb les adreces MAC trobades
-  // Serial.printf(*macAddresses);
   return macAddresses;
 }
 
-float getBatteryVoltage() {
-  // const int enBatterySensePin = 0;
-  pinMode(enVBatterySense, OUTPUT);
-  digitalWrite(enVBatterySense, LOW);  
-  
-  // const int batteryPin = 3;  // GPIO que llegeix la bateria
-  const float voltageDividerRatio = 2.0;  // divisor resistiu 1:1
-  static esp_adc_cal_characteristics_t adc_chars;  // característiques de calibració
 
-  // Calibració de l'ADC (només cal fer-ho un cop, però no és greu repetir)
-  esp_adc_cal_characterize(
-      ADC_UNIT_1,
-      ADC_ATTEN_DB_12,  // Fins a ~2.2V — ideal per llegir fins a 2.1V
-      ADC_WIDTH_BIT_12,
-      ESP_ADC_CAL_VAL_EFUSE_VREF,  // Usa la Vref gravada al xip si està disponible
-      &adc_chars
-  );
-
-  // // Llegir el valor cru
-  // uint32_t raw = analogRead(batteryPin);
-
-  // // Convertir a mil·liVolts tenint en compte la calibració
-  // uint32_t voltage_mV = esp_adc_cal_raw_to_voltage(raw, &adc_chars);
-
-
-  uint32_t sum_mV = 0;
-  for (int i = 0; i < 10; i++) {
-    uint32_t raw = analogRead(VbatSense);
-    sum_mV += esp_adc_cal_raw_to_voltage(raw, &adc_chars);
-    delay(2);  // petita pausa per estabilitzar lectura
-  }
-  uint32_t voltage_mV = sum_mV / 10;
-
-  // Serial.println(voltage_mV);
-
-  // Tornar la tensió real de la bateria
-  // Serial.println (voltage_mV * voltageDividerRatio/ 1000.0) ;  // volts
-  return (voltage_mV * voltageDividerRatio) / 1000.0;  // volts
-}
-
-// Función para calcular el porcentaje de batería
-int calculateBatteryPercentage(float voltage) {
-    // Valores típicos para batería LiPo
-    const float minVoltage = 3.2; // Voltaje mínimo de la batería
-    const float maxVoltage = 4.2; // Voltaje máximo de la batería
-    
-    if (voltage >= maxVoltage) return 100;
-    if (voltage <= minVoltage) return 0;
-    
-    int percentage = ((voltage - minVoltage) / (maxVoltage - minVoltage)) * 100;
-    return constrain(percentage, 0, 100);
-}
-
-// Función para detectar si está cargando
-bool isDeviceCharging() {
-    // Esto depende de tu circuito de carga
-    // Podrías usar un pin digital para detectar el estado de carga
-    const int chargingPin = 2; // Pin conectado al indicador de carga
-    
-    // Si tienes un pin que se pone HIGH cuando está cargando
-    return digitalRead(chargingPin) == HIGH;
-    
-    // Alternativa: detectar por incremento de voltaje
-    // (requiere mediciones consecutivas)
-}
+// ════════════════════════════════════════════════════════════════
+//  SERVIDOR WEB (portal captiu de configuració)
+// ════════════════════════════════════════════════════════════════
 
 void serveixWifiManager(AsyncWebServerRequest *request) {
-  String path = "/wifimanager_" + String(idioma) + ".html";
+  String path = "/wifimanager_" + String(IDIOMA) + ".html";
   request->send(LittleFS, path, "text/html");
 }
 
-void webServerSetup(){
-  // accedeix aquí just conectar-se a la wifi des de l'ordinador
+void webServerSetup() {
   server.on("/", HTTP_GET, serveixWifiManager);
-  // Required
-	server.on("/connecttest.txt", [](AsyncWebServerRequest *request) { request->redirect("http://logout.net"); });	// windows 11 captive portal workaround
-	server.on("/wpad.dat", [](AsyncWebServerRequest *request) { request->send(404); });
-
-  // accedeix aquí just conectar-se a la wifi des del mobil android
-  server.on("/generate_204", HTTP_GET, serveixWifiManager);
-
-// .  server.on("/connecttest.txt", HTTP_GET, serveixWifiManager);
-  server.on("/ncsi.txt", HTTP_GET, serveixWifiManager);
-  
-  // Rutas adicionales para engañar a Windows
-  server.on("/hotspot-detect.html", HTTP_GET, serveixWifiManager);
+  server.on("/connecttest.txt", [](AsyncWebServerRequest *request) { request->redirect("http://logout.net"); });
+  server.on("/wpad.dat",        [](AsyncWebServerRequest *request) { request->send(404); });
+  server.on("/generate_204",    HTTP_GET, serveixWifiManager);
+  server.on("/ncsi.txt",        HTTP_GET, serveixWifiManager);
+  server.on("/hotspot-detect.html",       HTTP_GET, serveixWifiManager);
   server.on("/library/test/success.html", HTTP_GET, serveixWifiManager);
-  server.on("/success.txt", [](AsyncWebServerRequest *request) { request->send(200); });					   // firefox captive portal call home
-  server.on("/redirect", HTTP_GET, serveixWifiManager);
-  server.on("/fwlink", HTTP_GET, serveixWifiManager);
-  server.on("/cdn-cgi/", HTTP_GET, serveixWifiManager);
-  server.on("/canonical.html", HTTP_GET, serveixWifiManager);
+  server.on("/success.txt",     [](AsyncWebServerRequest *request) { request->send(200); });
+  server.on("/redirect",        HTTP_GET, serveixWifiManager);
+  server.on("/fwlink",          HTTP_GET, serveixWifiManager);
+  server.on("/cdn-cgi/",        HTTP_GET, serveixWifiManager);
+  server.on("/canonical.html",  HTTP_GET, serveixWifiManager);
+  server.on("/favicon.ico",     [](AsyncWebServerRequest *request) { request->send(404); });
 
-  // return 404 to webpage icon
-	server.on("/favicon.ico", [](AsyncWebServerRequest *request) { request->send(404); });	// webpage icon
-
-  server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request){
+  server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(LittleFS, "/style.css", "text/css");
-    Serial.println("Served CSS");
+    Serial.println("[WEB] Served CSS");
   });
 
   server.on("/mac", HTTP_GET, [](AsyncWebServerRequest *request) {
-      request->send(200, "text/plain", strMac); //String(mac).c_str());
-      Serial.println(strMac);
+    request->send(200, "text/plain", strMac);
+    Serial.println("[WEB] MAC: " + strMac);
   });
 
   server.on("/deletemac", HTTP_GET, [](AsyncWebServerRequest *request) {
-      request->send(200, "text/plain", "macDeleted"); //String(mac).c_str());
-      deleteEeprom();
-      Serial.println("Mac esborrada");
-      readEeprom();
+    request->send(200, "text/plain", "macDeleted");
+    #ifndef HARDCODED_CONFIG
+      deleteMac();
+    #endif
+    Serial.println("[WEB] MAC esborrada");
   });
 
-  // Ruta per obtenir la llista d'adreces MAC
   server.on("/macList", HTTP_GET, [](AsyncWebServerRequest *request) {
-    String macListStr = "";  // Crear una cadena per a les adreces MAC
-    String* macList = scanNetworks();  // Crida a la funció per obtenir les adreces MAC
-    // Serial.println(*macList);
-
-    Serial.println("Llista de xarxes trobades:");
+    String macListStr = "";
+    String* macList = scanNetworks();
     for (int i = 0; i < MAX_NETWORKS; i++) {
-      if (macList[i] != "") {  // Només afegir adreces MAC no buides
-        macListStr += macList[i];  // Afegir l'adreça MAC a la cadena
-        macListStr += "\n";  // Afegir un salt de línia entre cada MAC
-
-        // Serial.println(macList[i]);
-      }
+      if (macList[i] != "") macListStr += macList[i] + "\n";
     }
-    // Retornar la cadena amb totes les adreces MAC
     request->send(200, "text/plain", macListStr);
-    Serial.println(macListStr);
-
+    Serial.println("[WEB] macList: " + macListStr);
   });
 
   server.on("/mymac", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(200, "text/plain", myAddresssDoted); //String(mac).c_str());
-    Serial.println(myAddresssDoted);
+    request->send(200, "text/plain", myAddresssDoted);
+    Serial.println("[WEB] myMAC: " + myAddresssDoted);
   });
 
   server.on("/battery", HTTP_GET, [](AsyncWebServerRequest *request) {
-    // Obtener el nivel de batería (esto depende de tu configuración de hardware)
-    // float batteryVoltage = 3.8;//getBatteryVoltage(); // Función que debes implementar
-    // int batteryLevel = 100;//calculateBatteryPercentage(batteryVoltage);
-    // bool isCharging = true;//isDeviceCharging(); // Función que debes implementar
-    
-    // Crear JSON response
-    String jsonResponse = "{";
-    jsonResponse += "\"level\":" + String(batteryLevel) + ",";
-    jsonResponse += "\"charging\":" + String(isCharging ? "true" : "false");
-    jsonResponse += "}";
-    
-    request->send(200, "application/json", jsonResponse);
-    Serial.println("Battery info sent: " + String(batteryLevel) + "% - Charging: " + String(isCharging));
+    String json = "{\"level\":" + String(batteryLevel) +
+                  ",\"charging\":" + String(isCharging ? "true" : "false") + "}";
+    request->send(200, "application/json", json);
+    Serial.printf("[WEB] battery: %d%% charging=%s\n", batteryLevel, isCharging ? "true" : "false");
+  });
 
-    // batteryVoltage = getBatteryVoltage(); // Función que debes implementar
-    // batteryLevel = calculateBatteryPercentage(batteryVoltage);
-    // isCharging = false;//isDeviceCharging(); // Función que debes implementar
+  // Retorna "hardcoded" o "web" per al HTML
+  server.on("/configMode", HTTP_GET, [](AsyncWebServerRequest *request) {
+    #ifdef HARDCODED_CONFIG
+      request->send(200, "text/plain", "hardcoded");
+    #else
+      request->send(200, "text/plain", "web");
+    #endif
+  });
 
-    // Serial.println(batteryVoltage);
-    // Serial.println(batteryLevel);
+  // Retorna versió firmware, variant i MAC pròpia
+  server.on("/info", HTTP_GET, [](AsyncWebServerRequest *request) {
+    #if defined(BLAULINK_V1)
+      const char* variant = "V1";
+    #elif defined(BLAULINK_V2)
+      const char* variant = "V2";
+    #elif defined(PICO_CLICK)
+      const char* variant = "PICO_CLICK";
+    #endif
+    String json = "{\"version\":\"" + String(FIRMWARE_VERSION) + "\","
+                  "\"variant\":\"" + String(variant) + "\","
+                  "\"mac\":\"" + myAddresssDoted + "\"}";
+    request->send(200, "application/json", json);
   });
 
   server.on("/disconnect-ap", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(200, "text/plain", "Disconnecting WiFi AP...");
-    
     delay(1000);
-    // esp_deep_sleep_start();
-    // digitalWrite(enBoto, LOW);
-    if(enBoto!=99){
-      digitalWrite(enBoto, LOW);
-    }else{
+    if (PIN_EN_BOTO != PIN_UNUSED) {
+      digitalWrite(PIN_EN_BOTO, LOW);
+    } else {
       esp_deep_sleep_start();
     }
-    // // Apagar WiFi abans de dormir
-    // dnsServer.stop();
-    // webServer.end();
-    // WiFi.softAPdisconnect(true);
-    // WiFi.mode(WIFI_OFF);
-    // btStop();
-    // esp_wifi_stop();
   });
 
-  // reb les variables des de la web
   server.on("/", HTTP_POST, [](AsyncWebServerRequest *request) {
-    int params = request->params();
-    for(int i=0;i<params;i++){
-      const AsyncWebParameter* p = request->getParam(i);
-      if(p->isPost()){
-        if (p->name() == PARAM_INPUT_1) {
+    #ifndef HARDCODED_CONFIG
+      int params = request->params();
+      for (int i = 0; i < params; i++) {
+        const AsyncWebParameter* p = request->getParam(i);
+        if (p->isPost() && p->name() == PARAM_INPUT_1) {
           strMac = p->value().c_str();
-          Serial.print("Nova adreça MAC: -");
-          Serial.print(strMac);
-          Serial.println("-");
-          //EEPROM.write(0, String(mac));
+          Serial.printf("[WEB] Nova MAC: %s\n", strMac.c_str());
           strMac.replace(":", "");
-          if(strMac == ""){
-            Serial.println("no introduida cap mac, no guardar");
-          }else{
-            for (int i = 0; i < 6; i++) {
-              String byteString = strMac.substring(i * 2, i * 2 + 2); // Obtenim cada parell de dígits
-              receiverMac[i] = strtol(byteString.c_str(), NULL, 16); // Convertim el parell a byte
-              EEPROM.write(i, receiverMac[i]);
+          if (strMac.length() > 0) {
+            for (int j = 0; j < 6; j++) {
+              receiverMac[j] = strtol(strMac.substring(j * 2, j * 2 + 2).c_str(), NULL, 16);
             }
-            EEPROM.commit();
+            strMac = macToString(receiverMac);
+            saveMac();
           }
         }
       }
-    }
-    
-    request->send(200, "text/plain", "Configurat! Ja pots prova");
+    #endif
+    request->send(200, "text/plain", "Configurat! Ja pots provar");
     delay(1000);
-    // esp_deep_sleep_start();
-    // digitalWrite(enBoto, LOW);
-    if(enBoto!=99){
-      digitalWrite(enBoto, LOW);
-    }else{
+    if (PIN_EN_BOTO != PIN_UNUSED) {
+      digitalWrite(PIN_EN_BOTO, LOW);
+    } else {
       esp_deep_sleep_start();
     }
-    //ESP.restart();
   });
 
-
-  // accedeix aquí quan busques qualsevol web al navegador
-  server.onNotFound(serveixWifiManager);
-  // // IMPORTANTE: Configurar el manejador para solicitudes no encontradas
-  // server.onNotFound([](AsyncWebServerRequest *request){
-  //   // Esto es crucial para el portal cautivo
-  //   request->redirect("http://" + WiFi.softAPIP().toString());
+  // Pàgines de configuració
+  // server.on("/config",   HTTP_GET, [](AsyncWebServerRequest *request) {
+  //   request->send(LittleFS, "/config.html",   "text/html");
+  // });
+  // server.on("/wifi",     HTTP_GET, [](AsyncWebServerRequest *request) {
+  //   request->send(LittleFS, "/wifi.html",     "text/html");
+  // });
+  // server.on("/mqtt",     HTTP_GET, [](AsyncWebServerRequest *request) {
+  //   request->send(LittleFS, "/mqtt.html",     "text/html");
+  // });
+  // server.on("/hardware", HTTP_GET, [](AsyncWebServerRequest *request) {
+  //   request->send(LittleFS, "/hardware.html", "text/html");
   // });
 
-  server.begin();                         //Starts the server process
-  Serial.println("Web server started");
+  // Accions del dispositiu
+  server.on("/restart", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "text/plain", "Reiniciant...");
+    delay(500);
+    ESP.restart();
+  });
+
+  server.on("/clearconfig", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "text/plain", "Config esborrada. Reiniciant...");
+    #ifndef HARDCODED_CONFIG
+      clearConfig();
+    #endif
+    delay(500);
+    ESP.restart();
+  });
+
+  server.onNotFound(serveixWifiManager);
+  server.begin();
+  Serial.println("[WEB] server started");
 }
 
-void getMyMacAddress() {
-  // myAddresssDoted = WiFi.macAddress();  //retorna la MAC de la interfície WiFi STA (station)
-  myAddresssDoted = WiFi.softAPmacAddress();    //retorna la MAC de la interfície WiFi AP (access point)
-  // Serial.print("MAC del microcontrolador: ");
 
+// ════════════════════════════════════════════════════════════════
+//  WIFI / ACCESS POINT
+// ════════════════════════════════════════════════════════════════
+
+void getMyMacAddress() {
+  myAddresssDoted = WiFi.softAPmacAddress();
   myAddresss = myAddresssDoted;
   myAddresss.replace(":", "");
-  Serial.print("La meva adreça MAC (sta)"); Serial.println(myAddresssDoted);
+  Serial.printf("[WIFI] MAC AP: %s\n", myAddresssDoted.c_str());
   myAddresssEnd = myAddresss.substring(myAddresss.length() - 4);
 }
 
-void wifiApModeServer(){
-  WiFi.mode(WIFI_STA);    // Iniciat wifi en station mode per poder llegir la MAC
-  
+void wifiApModeServer() {
+  WiFi.mode(WIFI_STA);
   getMyMacAddress();
-  String fullSSID = String(ssid) + "_" + myAddresssEnd;     // Concatenar el nom base ssid amb els últims 4 digits de l'adreça MAC
-  WiFi.softAP(fullSSID.c_str(), password);                  //This starts the WIFI radio in access point mode
-  Serial.println("Wifi initialized");
-  Serial.println(WiFi.softAPIP());                          //Print out the IP address
-  
-  dnsServer.start(53, "*", WiFi.softAPIP());                //This starts the DNS server.  The "*" sends any request for port 53 straight to the IP address of the device
-  
-  webServerSetup();                                         //Configures the behavior of the web server
-  Serial.println("Setup complete");
+  String fullSSID = String(WIFI_SSID) + "_" + myAddresssEnd;
+  WiFi.softAP(fullSSID.c_str(), WIFI_PASSWORD);
+  Serial.printf("[WIFI] AP ok: %s  IP: %s\n", fullSSID.c_str(), WiFi.softAPIP().toString().c_str());
+
+  dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
+  webServerSetup();
 }
 
+
+// ════════════════════════════════════════════════════════════════
+//  SETUP
+// ════════════════════════════════════════════════════════════════
+
 void setup() {
-  startTime = millis();     // Set starting time variable 
-  
-  // Init. pinout
-  pinMode(Boto, INPUT);
-  if (enBoto != 99) pinMode(enBoto, OUTPUT), digitalWrite(enBoto, HIGH);
-  
-  Serial.begin(115200);     // Init. serial port
-  
-  // delay(2000);
-  Serial.println(">> inici");
-  
-  EEPROM.begin(7);        // Init. eeprom memory: 6 bytes MAC + 1 byte canal cache
-  
+  startTime = millis();
 
-  if (!LittleFS.begin()) return Serial.println("Error muntant LittleFS"), void();   // Init. file system
+  pinMode(PIN_BOTO, INPUT);
+  if (PIN_EN_BOTO != PIN_UNUSED) {
+    pinMode(PIN_EN_BOTO, OUTPUT);
+    digitalWrite(PIN_EN_BOTO, HIGH);
+  }
+  if (PIN_CHARGE != PIN_UNUSED) {
+    pinMode(PIN_CHARGE, INPUT);
+  }
 
-  readEeprom();
+  Serial.begin(SERIAL_BAUD);
+  Serial.println("[BOOT] inici BlauLink " FIRMWARE_VERSION);
 
-  batteryVoltage = getBatteryVoltage(); // Función que debes implementar
-  batteryLevel = calculateBatteryPercentage(batteryVoltage);
-  isCharging = false;//isDeviceCharging(); // Función que debes implementar
+  if (!LittleFS.begin()) {
+    Serial.println("[BOOT] Error muntant LittleFS");
+    return;
+  }
 
-  // Serial.print("batteryVoltage: ");
-  // Serial.println(batteryVoltage);
-  // Serial.print("batteryLevel: ");
-  // Serial.println(batteryLevel);
+  #ifndef HARDCODED_CONFIG
+    #ifdef CLEAR_CONFIG
+      clearConfig();
+      Serial.println("[BOOT] CLEAR_CONFIG: NVS esborrada, reiniciant...");
+      ESP.restart();
+    #endif
+  #endif
 
-  // Init. digital led
-  FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
-  leds[0] = CRGB::Black;
-  FastLED.show();
+  readAllConfigs();
 
+  batteryVoltage = getBatteryVoltage();
+  batteryLevel   = calculateBatteryPercentage(batteryVoltage);
+  isCharging     = isDeviceCharging();
+  Serial.printf("[BATT] %.2fV  %d%%  charging=%s\n",
+                batteryVoltage, batteryLevel, isCharging ? "yes" : "no");
 
-  if(isMacValid(receiverMac)){  //strMac != "FF:FF:FF:FF:FF:FF"){
-    // Use cached channel to skip the scan on repeated presses
+  strip.begin();
+  strip.setBrightness(map(BRIGHTNESS_DEF, 0, 100, 0, 255));
+  strip.clear();
+  strip.show();
+
+  if (isMacValid(receiverMac)) {
     uint8_t ch = getCachedChannel();
     if (ch == 0) {
-      ch = findBlauTriggerChannel();  // first use or cache invalidated
+      strip.setPixelColor(0, COLOR_SCAN);
+      strip.show();
+      ch = findBlauTriggerChannel();
       setCachedChannel(ch);
     } else {
-      Serial.printf("Usant canal en caché: %d (sense scan)\n", ch);
+      Serial.printf("[ESPNOW] Usant canal en caché: %d\n", ch);
     }
-
     config_ESPNOW(ch);
     bool ok = send_ESPNOW();
-
     if (!ok) {
-      // Channel may have changed — update cache for next press
+      strip.setPixelColor(0, COLOR_SCAN);
+      strip.show();
       uint8_t newCh = findBlauTriggerChannel();
       setCachedChannel(newCh);
     }
-
-  }else{
-    Serial.println("No hi ha cap MAC del slave guardada");
-    leds[0] = CRGB::Yellow;
-    FastLED.show();
+  } else {
+    Serial.println("[BOOT] Cap MAC guardada, entrant al mode AP");
+    strip.setPixelColor(0, COLOR_NO_MAC);
+    strip.show();
   }
 
   delay(10);
 }
 
+
+// ════════════════════════════════════════════════════════════════
+//  LOOP PRINCIPAL
+// ════════════════════════════════════════════════════════════════
+
 void loop() {
-  if(digitalRead(Boto)){
-    leds[0] = CRGB::Black;
-    FastLED.show();
+  if (digitalRead(PIN_BOTO)) {
+    strip.clear();
+    strip.show();
     delay(100);
-  }else{
-    if(enBoto!=99){
-      digitalWrite(enBoto, LOW);
-    }else{
+  } else {
+    if (PIN_EN_BOTO != PIN_UNUSED) {
+      digitalWrite(PIN_EN_BOTO, LOW);
+    } else {
       esp_deep_sleep_start();
     }
   }
 
-  if(startTime + 3000 < millis()){
-
-    Serial.print("MAC guardada:  "); Serial.println(strMac);
-
-    leds[0] = CRGB::Blue;
-    FastLED.show();
+  if (startTime + WIFI_AP_HOLD_MS < millis()) {
+    Serial.printf("[BTN] Hold -> mode AP. MAC guardada: %s\n", strMac.c_str());
 
     wifiApModeServer();
 
-    bool buttonStateLow1=false;
-    bool buttonStateHigh2=false;
     bool buttonReleased = false;
-    while(1){
-      dnsServer.processNextRequest();     //requisit dns constant
-      
+    while (1) {
+      dnsServer.processNextRequest();
 
-      if(startTime + 60000 < millis()){         // s'apaga l'equip després de 60 segons
-        Serial.println("Temps excedit");
+      uint16_t osc   = (millis() / 2) % 510;
+      uint8_t  bright = (osc < 255) ? osc : 510 - osc;
+      strip.setBrightness(bright);
+      strip.setPixelColor(0, COLOR_WIFI_AP);
+      strip.show();
+
+      if (startTime + WIFI_AP_TIMEOUT_MS < millis()) {
+        Serial.println("[AP] Temps excedit");
         delay(200);
-
-        if(enBoto!=99){                         // s'apaga per enLDO o per deepsleep
-          digitalWrite(enBoto, LOW);
-        }else{
+        if (PIN_EN_BOTO != PIN_UNUSED) {
+          digitalWrite(PIN_EN_BOTO, LOW);
+        } else {
           esp_deep_sleep_start();
         }
       }
 
-
-
-      // seqüència per detectar que el boto es deixa de presionar i es torna a presionar, per apagar l'equip
-      static bool lastButtonState = HIGH;       // Estat anterior del botó
-      bool buttonState = digitalRead(Boto);     // Llegeix el botó
+      static bool lastButtonState = HIGH;
+      bool buttonState = digitalRead(PIN_BOTO);
 
       if (buttonState == LOW && lastButtonState == HIGH && !buttonReleased) {
-          buttonReleased = true;                // Marquem que s'ha alliberat el botó
-          Serial.println("Botó alliberat");
-          delay(200);
+        buttonReleased = true;
+        Serial.println("[BTN] Boto alliberat");
+        delay(200);
       }
-
       if (buttonState == HIGH && lastButtonState == LOW && buttonReleased) {
-          Serial.println("Botó premut després d'alliberar");
-          buttonReleased = false;                 // Reiniciem per detectar una nova seqüència
-          delay(200);
-
-          if(enBoto!=99){                         // s'apaga per enLDO o per deepsleep
-            digitalWrite(enBoto, LOW);
-          }else{
-            esp_deep_sleep_start();
-          }
+        Serial.println("[BTN] Boto premut despres d'alliberar -> apagant");
+        buttonReleased = false;
+        delay(200);
+        if (PIN_EN_BOTO != PIN_UNUSED) {
+          digitalWrite(PIN_EN_BOTO, LOW);
+        } else {
+          esp_deep_sleep_start();
+        }
       }
-      lastButtonState = buttonState;              // Guardem l'estat per a la següent iteració
+      lastButtonState = buttonState;
     }
   }
-
 }
