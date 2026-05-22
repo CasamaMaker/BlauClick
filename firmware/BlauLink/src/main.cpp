@@ -51,8 +51,12 @@ volatile uint8_t     blau_ack_result   = 0;
 static volatile bool _mac_delivery_ok  = false;
 
 // ── ADC i bateria ────────────────────────────────────────────────
+// esp_adc_cal only available on ESP32, S2, C3 — S3/C6 use analogReadMilliVolts()
+#if defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32S2) || defined(CONFIG_IDF_TARGET_ESP32C3)
 #include "esp_adc_cal.h"
 esp_adc_cal_characteristics_t adc_chars;
+#define USE_ESP_ADC_CAL
+#endif
 float batteryVoltage;
 int   batteryLevel;
 bool  isCharging;
@@ -187,13 +191,13 @@ void setCachedChannel(uint8_t) {}
 //  ESP-NOW
 // ════════════════════════════════════════════════════════════════
 
-void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+void OnDataSent(const wifi_tx_info_t *tx_info, esp_now_send_status_t status) {
   _mac_delivery_ok = (status == ESP_NOW_SEND_SUCCESS);
   Serial.println(_mac_delivery_ok ? "[ESPNOW] ACK TX: OK" : "[ESPNOW] ACK TX: FAIL");
 }
 
-void OnDataRecv(const uint8_t *mac, const uint8_t *data, int len) {
-  blau_on_data_recv(mac, data, len, &blau_ack_received, &blau_ack_seq, &blau_ack_result);
+void OnDataRecv(const esp_now_recv_info_t *recv_info, const uint8_t *data, int len) {
+  blau_on_data_recv(recv_info->src_addr, data, len, &blau_ack_received, &blau_ack_seq, &blau_ack_result);
 }
 
 uint8_t findBlauTriggerChannel() {
@@ -291,16 +295,29 @@ float getBatteryVoltage() {
   }
 
   const float voltageDividerRatio = 2.0;
-  static esp_adc_cal_characteristics_t adc_chars_local;
-  esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_12, ADC_WIDTH_BIT_12,
-                           ESP_ADC_CAL_VAL_EFUSE_VREF, &adc_chars_local);
-
   uint32_t sum_mV = 0;
+
+#ifdef USE_ESP_ADC_CAL
+  static esp_adc_cal_characteristics_t adc_chars_local;
+  esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_12,
+#if defined(CONFIG_IDF_TARGET_ESP32S2)
+                           ADC_WIDTH_BIT_13,
+#else
+                           ADC_WIDTH_BIT_12,
+#endif
+                           ESP_ADC_CAL_VAL_EFUSE_VREF, &adc_chars_local);
   for (int i = 0; i < BATTERY_SAMPLES; i++) {
     uint32_t raw = analogRead(PIN_VBAT);
     sum_mV += esp_adc_cal_raw_to_voltage(raw, &adc_chars_local);
     delay(2);
   }
+#else
+  for (int i = 0; i < BATTERY_SAMPLES; i++) {
+    sum_mV += analogReadMilliVolts(PIN_VBAT);
+    delay(2);
+  }
+#endif
+
   return (sum_mV / BATTERY_SAMPLES * voltageDividerRatio) / 1000.0;
 }
 

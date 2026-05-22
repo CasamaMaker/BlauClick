@@ -111,7 +111,7 @@
 // ════════════════════════════════════════════════════════════════
 //  SISTEMA
 // ════════════════════════════════════════════════════════════════
-#define FIRMWARE_VERSION    "1.1"
+#define FIRMWARE_VERSION    "0.9"
 #define SERIAL_BAUD         115200
 #define WIFI_AP_HOLD_MS       3000   // ms prement el botó per entrar al mode AP
 #define WIFI_AP_TIMEOUT_MS   60000   // ms màxims en mode AP abans d'apagar el dispositiu
