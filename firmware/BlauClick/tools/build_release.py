@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-BlauLink release builder.
+BlauClick release builder.
 
 Compila tots els entorns i el filesystem, i fusiona els binaris en un sol
 .bin per entorn que es pot gravar amb:
-    esptool.py write_flash 0x0 BlauLink_<version>_<env>.bin
+    esptool.py write_flash 0x0 BlauClick_<version>_<env>.bin
 
 Ús:
     python tools/build_release.py
@@ -216,7 +216,7 @@ def merge(env: str, output_path: pathlib.Path, esptool_cmd: list):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="BlauLink release builder",
+        description="BlauClick release builder",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
@@ -242,7 +242,7 @@ def main():
     release_dir = ROOT / "release" / version
     release_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"\n=== BlauLink Release Builder — {version} ===\n")
+    print(f"\n=== BlauClick Release Builder — {version} ===\n")
     print(f"Entorns: {envs}")
     print(f"Sortida: {release_dir}\n")
 
@@ -257,7 +257,7 @@ def main():
             print("  [2/2] Construint filesystem (LittleFS)...")
             run([*pio_cmd, "run", "-e", env, "-t", "buildfs"], cwd=ROOT)
 
-        output = release_dir / f"BlauLink_{version}_{env}.bin"
+        output = release_dir / f"BlauClick_{version}_{env}.bin"
         print(f"  Fusionant → {output.name}")
         merge(env, output, esptool_cmd)
         size_kb = output.stat().st_size / 1024
@@ -269,7 +269,7 @@ def main():
     for f in sorted(release_dir.glob("*.bin")):
         print(f"  {f.name}  ({f.stat().st_size / 1024:.0f} KB)")
     print(f"\nGravar al micro:")
-    print(f"  esptool.py write_flash 0x0 BlauLink_{version}_<env>.bin\n")
+    print(f"  esptool.py write_flash 0x0 BlauClick_{version}_<env>.bin\n")
 
 
 if __name__ == "__main__":

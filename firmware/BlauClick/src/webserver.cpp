@@ -107,9 +107,9 @@ void webServerSetup() {
 
   // Retorna versió firmware, variant i MAC pròpia
   server.on("/info", HTTP_GET, [](AsyncWebServerRequest *request) {
-    #if defined(BLAULINK_V1)
+    #if defined(BLAUCLICK_V1)
       const char* variant = "V1";
-    #elif defined(BLAULINK_V2)
+    #elif defined(BLAUCLICK_V2)
       const char* variant = "V2";
     #elif defined(PICO_CLICK)
       const char* variant = "PICO_CLICK";

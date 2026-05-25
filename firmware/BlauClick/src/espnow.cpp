@@ -6,7 +6,7 @@
 #include "globals.h"
 #include "blauprotocol.h"
 #include "blauprotocol_link.h"
-#include "espnow_mgr.h"
+#include "espnow.h"
 
 // ── Seqüències ESP-NOW (estat intern del mòdul) ──────────────────
 static uint8_t       blau_seq          = 0;

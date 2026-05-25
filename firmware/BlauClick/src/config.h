@@ -3,8 +3,8 @@
 // ════════════════════════════════════════════════════════════════
 //  SELECCIÓ DEL DISPOSITIU  (descomenta un sol)
 // ════════════════════════════════════════════════════════════════
-// #define BLAULINK_V1
-#define BLAULINK_V2
+// #define BLAUCLICK_V1
+#define BLAUCLICK_V2
 // #define PICO_CLICK
 
 
@@ -13,7 +13,7 @@
 // ════════════════════════════════════════════════════════════════
 #define PIN_UNUSED  -1   // pin no connectat / no utilitzat
 
-#if defined(BLAULINK_V1)
+#if defined(BLAUCLICK_V1)
   #define PIN_EN_VBAT  4
   #define PIN_VBAT     3
   #define PIN_BOTO     5
@@ -21,7 +21,7 @@
   #define PIN_LED      6
   #define PIN_CHARGE   PIN_UNUSED
 
-#elif defined(BLAULINK_V2)
+#elif defined(BLAUCLICK_V2)
   #define PIN_EN_VBAT  0
   #define PIN_VBAT     3
   #define PIN_BOTO     1
@@ -38,7 +38,7 @@
   #define PIN_CHARGE   PIN_UNUSED
 
 #else
-  #error "Defineix una versió del dispositiu a config.h (BLAULINK_V1, BLAULINK_V2 o PICO_CLICK)"
+  #error "Defineix una versió del dispositiu a config.h (BLAUCLICK_V1, BLAUCLICK_V2 o PICO_CLICK)"
 #endif
 
 
@@ -68,7 +68,7 @@
 // ════════════════════════════════════════════════════════════════
 //  WIFI  (Access Point del portal de configuració)
 // ════════════════════════════════════════════════════════════════
-#define WIFI_SSID      "BlauLink"
+#define WIFI_SSID      "BlauClick"
 #define WIFI_PASSWORD  ""
 #define IDIOMA         "CAT"      // CAT | EN
 

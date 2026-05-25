@@ -1,6 +1,6 @@
 /**
  * @file    blauprotocol_link.h
- * @brief   BlauProtocol v1 — Funcions d'ajuda per al costat emissor (BlauLink)
+ * @brief   BlauProtocol v1 — Funcions d'ajuda per al costat emissor (BlauClick)
  *
  * Inclou:
  *   - Construcció de paquets EVENT, CMD, PING, STATUS_REQ
@@ -11,7 +11,7 @@
  * Nota: inclou blauprotocol_trg.h, que proporciona blau_parse_packet,
  * blau_print_packet i tota la lògica de recepció/validació compartida.
  *
- * Ús típic al BlauLink:
+ * Ús típic al BlauClick:
  *   BlauPacket_t pkt;
  *   uint8_t seq = millis() & 0xFF;
  *   blau_build_event_packet(&pkt, seq, EVT_CLICK_1);
@@ -160,7 +160,7 @@ static inline bool blau_send_with_ack(BlauPacket_t     *pkt,
         *ack_received = false;
 
         if (esp_now_send(dest_mac, (uint8_t *)pkt, sizeof(BlauPacket_t)) != ESP_OK) {
-            Serial.print("[BlauLink] esp_now_send error, intent=");
+            Serial.print("[BlauClick] esp_now_send error, intent=");
             Serial.println(attempt + 1);
             continue;
         }
@@ -170,19 +170,19 @@ static inline bool blau_send_with_ack(BlauPacket_t     *pkt,
             if (*ack_received && *ack_seq == pkt->seq) {
                 uint8_t st = *ack_result;
                 if (st == ACK_OK || st == ACK_DUPLICATE) {
-                    Serial.print("[BlauLink] ACK acceptat (intent ");
+                    Serial.print("[BlauClick] ACK acceptat (intent ");
                     Serial.print(attempt + 1);
                     Serial.print(") status=0x");
                     Serial.println(st, HEX);
                     return true;
                 }
-                Serial.print("[BlauLink] ACK rebutjat, status=0x");
+                Serial.print("[BlauClick] ACK rebutjat, status=0x");
                 Serial.println(st, HEX);
                 break;
             }
             delay(1);
         }
-        Serial.print("[BlauLink] Timeout/fail sense ACK, intent=");
+        Serial.print("[BlauClick] Timeout/fail sense ACK, intent=");
         Serial.println(attempt + 1);
     }
     return false;
@@ -191,7 +191,7 @@ static inline bool blau_send_with_ack(BlauPacket_t     *pkt,
 /* =========================================================
  * blau_on_data_recv
  *
- * Processador de paquets rebuts al costat BlauLink.
+ * Processador de paquets rebuts al costat BlauClick.
  * Cridar des del callback OnDataRecv d'ESP-NOW.
  *
  * Gestiona: TYPE_ACK (actualitza flags), TYPE_PONG, TYPE_STATUS_RSP.
@@ -224,7 +224,7 @@ static inline void blau_on_data_recv(const uint8_t    *mac,
 
     BlauPacket_t pkt;
     if (!blau_parse_packet(data, len, &pkt)) {
-        Serial.print("[BlauLink] Paquet invàlid (mida, CRC o versió), len=");
+        Serial.print("[BlauClick] Paquet invàlid (mida, CRC o versió), len=");
         Serial.println(len);
         return;
     }
@@ -235,17 +235,17 @@ static inline void blau_on_data_recv(const uint8_t    *mac,
         *ack_result   = pkt.p1;
         *ack_received = true;
     } else if (pkt.type == TYPE_PONG) {
-        Serial.print("[BlauLink] PONG rebut, seq=");
+        Serial.print("[BlauClick] PONG rebut, seq=");
         Serial.println(pkt.seq);
     } else if (pkt.type == TYPE_STATUS_RSP) {
-        Serial.print("[BlauLink] STATUS_RSP: on=");
+        Serial.print("[BlauClick] STATUS_RSP: on=");
         Serial.print(pkt.p1);
         Serial.print(" bri=");
         Serial.print(pkt.p2);
         Serial.print(" type=");
         Serial.println(pkt.p3);
     } else {
-        Serial.print("[BlauLink] Paquet inesperat, type=0x");
+        Serial.print("[BlauClick] Paquet inesperat, type=0x");
         Serial.println(pkt.type, HEX);
     }
 }

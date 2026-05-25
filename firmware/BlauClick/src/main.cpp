@@ -1,6 +1,6 @@
-// Blaulink, codi que te el boto que va amb bateria
-/* BlauLink projecte
- * https://github.com/CasamaMaker/BlauLink
+// BlauClick, codi que te el boto que va amb bateria
+/* BlauClick projecte
+ * https://github.com/CasamaMaker/BlauClick
  */
 
 #include <Arduino.h>
@@ -27,7 +27,7 @@
 #include "utils.h"
 #include "nvs_config.h"
 #include "battery.h"
-#include "espnow_mgr.h"
+#include "espnow.h"
 #include "webserver.h"
 #include "wifi_ap.h"
 
@@ -84,7 +84,7 @@ void setup() {
   }
 
   Serial.begin(SERIAL_BAUD);
-  Serial.println("[BOOT] inici BlauLink " FIRMWARE_VERSION);
+  Serial.println("[BOOT] inici BlauClick " FIRMWARE_VERSION);
 
   if (!LittleFS.begin()) {
     Serial.println("[BOOT] Error muntant LittleFS");
