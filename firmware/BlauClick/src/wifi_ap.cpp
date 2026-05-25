@@ -20,7 +20,8 @@ void getMyMacAddress() {
 }
 
 void wifiApModeServer() {
-  WiFi.mode(WIFI_STA);
+  // WiFi.mode(WIFI_STA);
+  WiFi.mode(WIFI_AP);
   getMyMacAddress();
   String fullSSID = String(WIFI_SSID) + "_" + myAddresssEnd;
   WiFi.softAP(fullSSID.c_str(), WIFI_PASSWORD);
