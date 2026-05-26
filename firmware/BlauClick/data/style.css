@@ -250,12 +250,46 @@ footer {
   .container {
     width: 95%;
   }
-  
+
   h1 {
     font-size: 1.5rem;
   }
-  
+
   .values {
     padding: 8px;
   }
+}
+
+/* --- Navegació multi-pàgina --- */
+.page { display: none; }
+.page.active { display: block; }
+
+.nav-btn {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  margin-bottom: 12px;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: var(--border-radius);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  text-align: center;
+}
+.nav-btn:hover { background-color: var(--secondary-color); }
+
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--primary-color);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0 0 12px 0;
 }

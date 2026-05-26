@@ -24,6 +24,10 @@ void readAllConfigs() {
   prefs.begin("blau", true);
   size_t n = prefs.getBytes("mac", receiverMac, 6);
   receiverSSID = prefs.getString("ssid", "");
+  g_cmd1 = prefs.getUChar("cmd1", 0x01u);
+  g_p1_1 = prefs.getUChar("p1_1", 0);
+  g_p2_1 = prefs.getUChar("p2_1", 0);
+  g_p3_1 = prefs.getUChar("p3_1", 0);
   prefs.end();
 
   if (n == 6 && isMacValid(receiverMac)) {
@@ -63,6 +67,17 @@ void deleteMac() {
   prefs.remove("ssid");
   prefs.end();
   Serial.println("[NVS] MAC, canal i SSID esborrats");
+}
+
+void saveCmd1Click(uint8_t cmd, uint8_t p1, uint8_t p2, uint8_t p3) {
+  g_cmd1 = cmd; g_p1_1 = p1; g_p2_1 = p2; g_p3_1 = p3;
+  prefs.begin("blau", false);
+  prefs.putUChar("cmd1", cmd);
+  prefs.putUChar("p1_1", p1);
+  prefs.putUChar("p2_1", p2);
+  prefs.putUChar("p3_1", p3);
+  prefs.end();
+  Serial.printf("[NVS] CMD1 guardat: cmd=%d p1=%d p2=%d p3=%d\n", cmd, p1, p2, p3);
 }
 
 uint8_t getCachedChannel() {

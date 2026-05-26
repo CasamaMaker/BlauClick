@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+  <link rel="stylesheet" type="text/css" href="style.css" />
+  <title>Configurador BlauClick</title>
+  <script src="/js/i18n.js"></script>
+  <script src="/js/debug.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/gpio.js"></script>
+  <script src="/js/app.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="header-title">
+        <h1 data-i18n="h1">Configurador BlauClick</h1>
+      </div>
+      <div class="header-right">
+        <select id="langSelector" onchange="setLanguage(this.value)"
+                style="font-size:13px; border:1px solid var(--primary-color); border-radius:6px;
+                       padding:3px 6px; color:var(--primary-color); background:white; cursor:pointer;">
+          <option value="ca">CA</option>
+          <option value="en">EN</option>
+          <option value="es">ES</option>
+        </select>
+        <div class="battery-indicator">
+          <div class="battery-icon" id="batteryIcon">
+            <svg class="battery-svg" viewBox="0 0 32 16" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="0" stroke-linecap="round" stroke-linejoin="round">
+              <!-- Contorno de la batería -->
+              <rect x="1" y="2" width="28" height="12" rx="2" class="battery-outline"/>
+              <rect x="29.5" y="5" width="1.5" height="6" rx="0.5" class="battery-outline"/>
+              <!-- Relleno de la batería -->
+              <rect x="2" y="3" width="0" height="10" rx="1" class="battery-fill" id="batteryFill"/>
+              <text x="15" y="8" class="battery-percentage" id="batteryPercentage">--</text>
+            </svg>
+          </div>
+        </div>
+      <!-- <a href="https://github.com/CasamaMaker/BlauClick" class="github-link" target="_blank">
+        <svg class="github-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+        </svg>
+      </a> -->
+      <!-- <a href="https://github.com/CasamaMaker/BlauClick" class="github-link" id="githubLink" target="_blank">
+          <svg class="github-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+          </svg>
+      </a> -->
+    </header>
+
+    <!-- Pàgina: Índex -->
+    <div id="page-index" class="page active">
+      <div class="card">
+        <label for="myMac" data-i18n="labelMyMac">La meva adreça MAC</label>
+        <div class="values">
+          <p><span id="myMac" data-i18n="loading">Carregant...</span></p>
+        </div>
+      </div>
+
+      <button class="nav-btn" onclick="showPage('page-1click')">1 Click</button>
+      <button class="nav-btn" onclick="showPage('page-2click')">2 Clicks</button>
+      <button class="nav-btn" onclick="showPage('page-3click')">3 Clicks</button>
+    </div>
+
+    <!-- Pàgina: 1 Click -->
+    <div id="page-1click" class="page">
+      <button class="back-btn" onclick="showPage('page-index')" data-i18n="navBack">&#8592; Enrere</button>
+
+      <div class="card">
+        <label for="macSaved" data-i18n="labelMacSaved">Adreça MAC esclau guardada</label>
+        <div class="values" style="display: flex; justify-content: space-between; align-items: center;">
+          <p><span id="macSaved" data-i18n="loading">Carregant...</span></p>
+          <button onclick="deleteMac()" style="background: none; border: none; cursor: pointer; color: var(--primary-color);">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3,6 5,6 21,6"></polyline>
+              <path d="m19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"></path>
+              <line x1="10" y1="11" x2="10" y2="17"></line>
+              <line x1="14" y1="11" x2="14" y2="17"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="card">
+        <form action="/" method="POST">
+          <label for="mac" data-i18n="labelNewMac">Nova adreça MAC esclau</label>
+          <input type="text" id="mac" name="mac" placeholder="XX:XX:XX:XX:XX:XX" maxlength="17" pattern="([A-Fa-f0-9]{2}:){5}[A-Fa-f0-9]{2}" title="Formato requerido: XX:XX:XX:XX:XX:XX" oninput="formatMAC(this)"/>
+          <input type="hidden" id="ssid" name="ssid" value="" />
+          <input type="submit" data-i18n-value="submitMacBtn" value="Guardar MAC" />
+        </form>
+      </div>
+
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <h3 data-i18n="devicesFound">Dispositius trobats</h3>
+          <button onclick="refreshDevices()" style="background: none; border: none; cursor: pointer; color: var(--primary-color);">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+          </button>
+        </div>
+        <label for="ssidFilter" style="display: flex; align-items: center; gap: 6px; font-weight: normal; color: var(--text-color); font-size: 14px; margin-top: 4px; margin-bottom: 6px; cursor: pointer;">
+          <input type="checkbox" id="ssidFilter" checked onchange="applyFilter()">
+          <span data-i18n="filterLabel">Mostra només </span>"<strong>BlauLux_</strong>"
+        </label>
+        <div id="macList">
+          <p data-i18n="scanningDevices">Escaneant dispositius...</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="ordresTitle">Ordres</h3>
+        <div id="cmdList">
+          <label class="cmd-option"><input type="radio" name="cmd1click" value="1" onchange="onCmdChange(this.value)" checked> <span data-i18n="cmdToggle">Toggle</span></label>
+          <label class="cmd-option"><input type="radio" name="cmd1click" value="2" onchange="onCmdChange(this.value)"> <span data-i18n="cmdOn">On</span></label>
+          <label class="cmd-option"><input type="radio" name="cmd1click" value="3" onchange="onCmdChange(this.value)"> <span data-i18n="cmdOff">Off</span></label>
+          <label class="cmd-option"><input type="radio" name="cmd1click" value="4" onchange="onCmdChange(this.value)"> <span data-i18n="cmdSetBrightness">Set Brightness</span></label>
+          <label class="cmd-option cmd-disabled"><input type="radio" name="cmd1click" value="5" disabled> <span data-i18n="cmdSetRgb">RGB</span></label>
+          <label class="cmd-option cmd-disabled"><input type="radio" name="cmd1click" value="6" disabled> <span data-i18n="cmdSetCct">CCT</span></label>
+          <label class="cmd-option cmd-disabled"><input type="radio" name="cmd1click" value="7" disabled> <span data-i18n="cmdSetScene">Scene</span></label>
+          <label class="cmd-option cmd-disabled"><input type="radio" name="cmd1click" value="8" disabled> <span data-i18n="cmdDimUp">Up</span></label>
+          <label class="cmd-option cmd-disabled"><input type="radio" name="cmd1click" value="9" disabled> <span data-i18n="cmdDimDown">Down</span></label>
+        </div>
+        <div id="brightnessControl" style="display:none; margin-top:10px;">
+          <label data-i18n="brightnessLabel">Brillantor</label>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <input type="range" id="brightnessSlider" min="0" max="100" value="50" oninput="document.getElementById('brightnessValue').textContent=this.value" style="flex:1;">
+            <span id="brightnessValue">50</span><span>%</span>
+          </div>
+        </div>
+        <div id="rgbControl" style="display:none; margin-top:10px;">
+          <label data-i18n="rgbLabel">Color RGB</label>
+          <input type="color" id="rgbPicker" value="#ff0000" disabled style="width:100%; height:40px; border:none; cursor:not-allowed;">
+        </div>
+        <input type="button" onclick="saveCmdConfig()" data-i18n-value="saveCmdBtn" value="Guardar configuració" style="margin-top:14px;" />
+      </div>
+    </div>
+
+    <!-- Pàgina: 2 Clicks -->
+    <div id="page-2click" class="page">
+      <button class="back-btn" onclick="showPage('page-index')" data-i18n="navBack">&#8592; Enrere</button>
+      <div class="card">
+        <label>2 Clicks</label>
+        <p data-i18n="comingSoon">Pròximament...</p>
+      </div>
+    </div>
+
+    <!-- Pàgina: 3 Clicks -->
+    <div id="page-3click" class="page">
+      <button class="back-btn" onclick="showPage('page-index')" data-i18n="navBack">&#8592; Enrere</button>
+      <div class="card">
+        <label>3 Clicks</label>
+        <p data-i18n="comingSoon">Pròximament...</p>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>BlauClick 2.1 | Martí Casamayor</p>
+    <p style="display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: 5px;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+      </svg>
+      CasamaMaker/BlauClick
+    </p>
+  </footer>
+</body>
+</html>

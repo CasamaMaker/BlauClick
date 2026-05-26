@@ -37,8 +37,7 @@ String* scanNetworks() {
 // ════════════════════════════════════════════════════════════════
 
 void serveixWifiManager(AsyncWebServerRequest *request) {
-  String path = "/wifimanager_" + String(IDIOMA) + ".html";
-  request->send(LittleFS, path, "text/html");
+  request->send(LittleFS, "/wifimanager.html", "text/html");
 }
 
 void webServerSetup() {
@@ -60,6 +59,8 @@ void webServerSetup() {
     request->send(LittleFS, "/style.css", "text/css");
     Serial.println("[WEB] Served CSS");
   });
+
+  server.serveStatic("/js/", LittleFS, "/js/");
 
   server.on("/mac", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(200, "text/plain", strMac);
@@ -118,6 +119,26 @@ void webServerSetup() {
                   "\"variant\":\"" + String(variant) + "\","
                   "\"mac\":\"" + myAddresssDoted + "\"}";
     request->send(200, "application/json", json);
+  });
+
+  server.on("/1click_cmd", HTTP_GET, [](AsyncWebServerRequest *request) {
+    String json = "{\"cmd\":" + String(g_cmd1) +
+                  ",\"p1\":"  + String(g_p1_1) +
+                  ",\"p2\":"  + String(g_p2_1) +
+                  ",\"p3\":"  + String(g_p3_1) + "}";
+    request->send(200, "application/json", json);
+    Serial.printf("[WEB] 1click_cmd: cmd=%d p1=%d p2=%d p3=%d\n", g_cmd1, g_p1_1, g_p2_1, g_p3_1);
+  });
+
+  server.on("/save_1click_cmd", HTTP_POST, [](AsyncWebServerRequest *request) {
+    #ifndef HARDCODED_CONFIG
+      uint8_t cmd = request->hasParam("cmd", true) ? (uint8_t)request->getParam("cmd", true)->value().toInt() : 0x01u;
+      uint8_t p1  = request->hasParam("p1",  true) ? (uint8_t)request->getParam("p1",  true)->value().toInt() : 0;
+      uint8_t p2  = request->hasParam("p2",  true) ? (uint8_t)request->getParam("p2",  true)->value().toInt() : 0;
+      uint8_t p3  = request->hasParam("p3",  true) ? (uint8_t)request->getParam("p3",  true)->value().toInt() : 0;
+      saveCmd1Click(cmd, p1, p2, p3);
+    #endif
+    request->send(200, "text/plain", "ok");
   });
 
   server.on("/disconnect-ap", HTTP_GET, [](AsyncWebServerRequest *request) {

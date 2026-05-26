@@ -45,6 +45,12 @@ char macStr[18];
 byte receiverMac[6];
 String receiverSSID = "";
 
+// ── 1-click command ──────────────────────────────────────────────
+uint8_t g_cmd1 = 0x01u;  // CMD_TOGGLE per defecte
+uint8_t g_p1_1 = 0;
+uint8_t g_p2_1 = 0;
+uint8_t g_p3_1 = 0;
+
 String myAddresss, myAddresssDoted, myAddresssEnd;
 
 // ── ADC i bateria ────────────────────────────────────────────────

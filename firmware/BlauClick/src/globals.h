@@ -29,6 +29,12 @@ extern String receiverSSID;
 
 extern String myAddresss, myAddresssDoted, myAddresssEnd;
 
+// ── 1-click command ──────────────────────────────────────────────
+extern uint8_t g_cmd1;
+extern uint8_t g_p1_1;
+extern uint8_t g_p2_1;
+extern uint8_t g_p3_1;
+
 // ── Bateria ───────────────────────────────────────────────────────
 extern float batteryVoltage;
 extern int   batteryLevel;

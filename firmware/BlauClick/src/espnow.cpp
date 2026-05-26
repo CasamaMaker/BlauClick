@@ -99,7 +99,7 @@ bool send_ESPNOW() {
   BlauPacket_t pkt;
   blau_seq = millis() & 0xFF;
   // blau_build_event_packet(&pkt, blau_seq, EVT_CLICK_1);
-  blau_build_cmd_packet(&pkt, blau_seq, CMD_TOGGLE, 0,0,0);
+  blau_build_cmd_packet(&pkt, blau_seq, g_cmd1, g_p1_1, g_p2_1, g_p3_1);
   // blau_build_cmd_packet(&pkt, blau_seq, CMD_SET_RGB, 255,0,0);
 
   bool ok = blau_send_with_ack(&pkt, receiverMac, &blau_ack_received, &blau_ack_seq, &blau_ack_result);

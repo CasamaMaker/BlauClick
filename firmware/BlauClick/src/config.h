@@ -70,8 +70,6 @@
 // ════════════════════════════════════════════════════════════════
 #define WIFI_SSID      "BlauClick"
 #define WIFI_PASSWORD  ""
-#define IDIOMA         "CAT"      // CAT | EN
-
 
 // ════════════════════════════════════════════════════════════════
 //  LED DIGITAL (NeoPixel / WS2812)
