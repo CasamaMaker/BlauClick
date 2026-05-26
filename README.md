@@ -1,17 +1,17 @@
-# BlauLink 🚀  
+# BlauClick 🚀  
 **A compact, battery-powered ESP32-C3 IoT smart button for fast, flexible control**
 
-[![GitHub version](https://img.shields.io/github/release/CasamaMaker/BlauLink.svg)](https://github.com/CasamaMaker/BlauLink/releases)
-[![GitHub downloads](https://img.shields.io/github/downloads/CasamaMaker/BlauLink/total.svg)](https://github.com/CasamaMaker/BlauLink/releases/latest)
-[![License](https://img.shields.io/github/license/CasamaMaker/BlauLink.svg)](LICENSE.txt)
+[![GitHub version](https://img.shields.io/github/release/CasamaMaker/BlauClick.svg)](https://github.com/CasamaMaker/BlauClick/releases)
+[![GitHub downloads](https://img.shields.io/github/downloads/CasamaMaker/BlauClick/total.svg)](https://github.com/CasamaMaker/BlauClick/releases/latest)
+[![License](https://img.shields.io/github/license/CasamaMaker/BlauClick.svg)](LICENSE.txt)
 
 ---
 
 ## 💡 Description
 
-**BlauLink** is a compact IoT smart button built around the ESP32-C3 (RISC-V) designed for low-power, fast-response applications. It enables seamless control of smart devices using **ESP-NOW**, making it ideal for home automation, DIY electronics, and custom IoT ecosystems.
+**BlauClick** is a compact IoT smart button built around the ESP32-C3 (RISC-V) designed for low-power, fast-response applications. It enables seamless control of smart devices using **ESP-NOW**, making it ideal for home automation, DIY electronics, and custom IoT ecosystems.
 
-Unlike traditional smart switches, BlauLink focuses on **speed, simplicity, and battery efficiency**, allowing direct communication between devices without relying on a central WiFi network.
+Unlike traditional smart switches, BlauClick focuses on **speed, simplicity, and battery efficiency**, allowing direct communication between devices without relying on a central WiFi network.
 
 ---
 
@@ -44,8 +44,8 @@ Unlike traditional smart switches, BlauLink focuses on **speed, simplicity, and 
 
 ### 1. Clone the repository
 
-    git clone https://github.com/CasamaMaker/BlauLink.git
-    cd BlauLink
+    git clone https://github.com/CasamaMaker/BlauClick.git
+    cd BlauClick
 
 ### 2. Open the project
 
@@ -127,4 +127,4 @@ Inspired by:
 
 ## 📷 Preview
 
-![BlauLink](pictures/2.jpg)
+![BlauClick](pictures/2.jpg)
