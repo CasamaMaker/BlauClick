@@ -26,6 +26,10 @@ const i18n = {
     brightnessLabel: 'Brillantor',
     rgbLabel:        'Color RGB',
     saveCmdBtn:      'Guardar configuració',
+    navLongClick:    'Click llarg',
+    navConfiguracio: 'Configuració',
+    navHardware:     'Hardware',
+    navAltres:       'Altres',
   },
   en: {
     pageTitle:      'BlauClick Configurator',
@@ -54,6 +58,10 @@ const i18n = {
     brightnessLabel: 'Brightness',
     rgbLabel:        'RGB Color',
     saveCmdBtn:      'Save configuration',
+    navLongClick:    'Long click',
+    navConfiguracio: 'Settings',
+    navHardware:     'Hardware',
+    navAltres:       'Others',
   },
   es: {
     pageTitle:      'Configurador BlauClick',
@@ -82,6 +90,10 @@ const i18n = {
     brightnessLabel: 'Brillo',
     rgbLabel:        'Color RGB',
     saveCmdBtn:      'Guardar configuración',
+    navLongClick:    'Click largo',
+    navConfiguracio: 'Configuración',
+    navHardware:     'Hardware',
+    navAltres:       'Otros',
   },
 };
 

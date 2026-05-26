@@ -281,6 +281,15 @@ footer {
 }
 .nav-btn:hover { background-color: var(--secondary-color); }
 
+.nav-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.nav-grid .nav-btn {
+  margin-bottom: 0;
+}
+
 .back-btn {
   display: inline-flex;
   align-items: center;

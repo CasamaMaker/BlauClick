@@ -59,9 +59,16 @@
         </div>
       </div>
 
-      <button class="nav-btn" onclick="showPage('page-1click')">1 Click</button>
-      <button class="nav-btn" onclick="showPage('page-2click')">2 Clicks</button>
-      <button class="nav-btn" onclick="showPage('page-3click')">3 Clicks</button>
+      <div class="card">
+        <div class="nav-grid">
+          <button class="nav-btn" onclick="showPage('page-1click')">1 Click</button>
+          <button class="nav-btn" onclick="showPage('page-2click')">2 Clicks</button>
+          <button class="nav-btn" onclick="showPage('page-3click')">3 Clicks</button>
+          <button class="nav-btn" onclick="showPage('page-longclick')" data-i18n="navLongClick">Click llarg</button>
+        </div>
+      </div>
+
+      <button class="nav-btn" onclick="showPage('page-configuracio')" data-i18n="navConfiguracio">Configuració</button>
     </div>
 
     <!-- Pàgina: 1 Click -->
@@ -152,6 +159,42 @@
       <button class="back-btn" onclick="showPage('page-index')" data-i18n="navBack">&#8592; Enrere</button>
       <div class="card">
         <label>3 Clicks</label>
+        <p data-i18n="comingSoon">Pròximament...</p>
+      </div>
+    </div>
+
+    <!-- Pàgina: Click llarg -->
+    <div id="page-longclick" class="page">
+      <button class="back-btn" onclick="showPage('page-index')" data-i18n="navBack">&#8592; Enrere</button>
+      <div class="card">
+        <label data-i18n="navLongClick">Click llarg</label>
+        <p data-i18n="comingSoon">Pròximament...</p>
+      </div>
+    </div>
+
+    <!-- Pàgina: Configuració -->
+    <div id="page-configuracio" class="page">
+      <button class="back-btn" onclick="showPage('page-index')" data-i18n="navBack">&#8592; Enrere</button>
+      <div class="card">
+        <button class="nav-btn" onclick="showPage('page-config-hardware')" data-i18n="navHardware">Hardware</button>
+        <button class="nav-btn" onclick="showPage('page-config-altres')" data-i18n="navAltres">Altres</button>
+      </div>
+    </div>
+
+    <!-- Pàgina: Config Hardware -->
+    <div id="page-config-hardware" class="page">
+      <button class="back-btn" onclick="showPage('page-configuracio')" data-i18n="navBack">&#8592; Enrere</button>
+      <div class="card">
+        <label data-i18n="navHardware">Hardware</label>
+        <p data-i18n="comingSoon">Pròximament...</p>
+      </div>
+    </div>
+
+    <!-- Pàgina: Config Altres -->
+    <div id="page-config-altres" class="page">
+      <button class="back-btn" onclick="showPage('page-configuracio')" data-i18n="navBack">&#8592; Enrere</button>
+      <div class="card">
+        <label data-i18n="navAltres">Altres</label>
         <p data-i18n="comingSoon">Pròximament...</p>
       </div>
     </div>
