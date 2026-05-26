@@ -293,3 +293,33 @@ footer {
   cursor: pointer;
   padding: 0 0 12px 0;
 }
+
+#cmdList {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.cmd-item {
+  background-color: #f0f0f0;
+  padding: 12px 8px;
+  border-radius: var(--border-radius);
+  transition: background-color 0.2s;
+  cursor: pointer;
+  text-align: center;
+}
+
+.cmd-item:hover:not(.cmd-item-disabled) {
+  background-color: #e0e0e0;
+}
+
+.cmd-item.cmd-item-selected {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.cmd-item.cmd-item-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

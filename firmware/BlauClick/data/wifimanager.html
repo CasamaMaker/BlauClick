@@ -113,15 +113,15 @@
       <div class="card">
         <h3 data-i18n="ordresTitle">Ordres</h3>
         <div id="cmdList">
-          <label class="cmd-option"><input type="radio" name="cmd1click" value="1" onchange="onCmdChange(this.value)" checked> <span data-i18n="cmdToggle">Toggle</span></label>
-          <label class="cmd-option"><input type="radio" name="cmd1click" value="2" onchange="onCmdChange(this.value)"> <span data-i18n="cmdOn">On</span></label>
-          <label class="cmd-option"><input type="radio" name="cmd1click" value="3" onchange="onCmdChange(this.value)"> <span data-i18n="cmdOff">Off</span></label>
-          <label class="cmd-option"><input type="radio" name="cmd1click" value="4" onchange="onCmdChange(this.value)"> <span data-i18n="cmdSetBrightness">Set Brightness</span></label>
-          <label class="cmd-option cmd-disabled"><input type="radio" name="cmd1click" value="5" disabled> <span data-i18n="cmdSetRgb">RGB</span></label>
-          <label class="cmd-option cmd-disabled"><input type="radio" name="cmd1click" value="6" disabled> <span data-i18n="cmdSetCct">CCT</span></label>
-          <label class="cmd-option cmd-disabled"><input type="radio" name="cmd1click" value="7" disabled> <span data-i18n="cmdSetScene">Scene</span></label>
-          <label class="cmd-option cmd-disabled"><input type="radio" name="cmd1click" value="8" disabled> <span data-i18n="cmdDimUp">Up</span></label>
-          <label class="cmd-option cmd-disabled"><input type="radio" name="cmd1click" value="9" disabled> <span data-i18n="cmdDimDown">Down</span></label>
+          <div class="cmd-item" data-value="1" onclick="selectCmd(this)" data-i18n="cmdToggle">Toggle</div>
+          <div class="cmd-item" data-value="2" onclick="selectCmd(this)" data-i18n="cmdOn">On</div>
+          <div class="cmd-item" data-value="3" onclick="selectCmd(this)" data-i18n="cmdOff">Off</div>
+          <div class="cmd-item" data-value="4" onclick="selectCmd(this)" data-i18n="cmdSetBrightness">Set Brightness</div>
+          <div class="cmd-item" data-value="5" onclick="selectCmd(this)" data-i18n="cmdSetRgb">RGB</div>
+          <div class="cmd-item cmd-item-disabled" data-value="6" data-i18n="cmdSetCct">CCT</div>
+          <div class="cmd-item cmd-item-disabled" data-value="7" data-i18n="cmdSetScene">Scene</div>
+          <div class="cmd-item cmd-item-disabled" data-value="8" data-i18n="cmdDimUp">Up</div>
+          <div class="cmd-item cmd-item-disabled" data-value="9" data-i18n="cmdDimDown">Down</div>
         </div>
         <div id="brightnessControl" style="display:none; margin-top:10px;">
           <label data-i18n="brightnessLabel">Brillantor</label>
@@ -132,9 +132,9 @@
         </div>
         <div id="rgbControl" style="display:none; margin-top:10px;">
           <label data-i18n="rgbLabel">Color RGB</label>
-          <input type="color" id="rgbPicker" value="#ff0000" disabled style="width:100%; height:40px; border:none; cursor:not-allowed;">
+          <input type="color" id="rgbPicker" value="#ff0000" style="width:100%; height:40px; border:none; cursor:pointer;">
         </div>
-        <input type="button" onclick="saveCmdConfig()" data-i18n-value="saveCmdBtn" value="Guardar configuració" style="margin-top:14px;" />
+        <input type="submit" onclick="saveCmdConfig()" data-i18n-value="saveCmdBtn" value="Guardar configuració" style="margin-top:14px;" />
       </div>
     </div>
 

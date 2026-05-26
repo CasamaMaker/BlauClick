@@ -231,14 +231,23 @@
       // setInterval(fetchBatteryLevel, 60000);
     }
 
+    function selectCmd(el) {
+      document.querySelectorAll('.cmd-item').forEach(function(d) {
+        d.classList.remove('cmd-item-selected');
+      });
+      el.classList.add('cmd-item-selected');
+      onCmdChange(el.getAttribute('data-value'));
+    }
+
     function initCmdCard() {
       var xhttp = new XMLHttpRequest();
       xhttp.onreadystatechange = function() {
         if (this.readyState == 4 && this.status == 200) {
           var data = JSON.parse(this.responseText);
-          var radios = document.querySelectorAll('input[name="cmd1click"]');
-          radios.forEach(function(r) {
-            if (parseInt(r.value) === data.cmd) r.checked = true;
+          document.querySelectorAll('.cmd-item').forEach(function(d) {
+            if (parseInt(d.getAttribute('data-value')) === data.cmd) {
+              d.classList.add('cmd-item-selected');
+            }
           });
           document.getElementById('brightnessSlider').value = data.p1;
           document.getElementById('brightnessValue').textContent = data.p1;
@@ -259,9 +268,9 @@
     }
 
     function saveCmdConfig() {
-      var sel = document.querySelector('input[name="cmd1click"]:checked');
+      var sel = document.querySelector('.cmd-item.cmd-item-selected');
       if (!sel) return;
-      var cmd = parseInt(sel.value);
+      var cmd = parseInt(sel.getAttribute('data-value'));
       var p1 = 0, p2 = 0, p3 = 0;
       if (cmd === 4) {
         p1 = parseInt(document.getElementById('brightnessSlider').value);
