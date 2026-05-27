@@ -194,7 +194,19 @@
           </select>
         </div>
 
-        <table style="width:100%;border-collapse:collapse;margin:16px 0 8px">
+        <div id="hwCustomSection" style="display:none">
+          <div class="form-row" style="margin-top:10px">
+            <label style="display:block;margin-bottom:4px;font-weight:600">Microcontrolador</label>
+            <select id="hwMcuSelect" onchange="hwSelectMcu(this.value)" style="width:100%">
+              <option value="">-- Selecciona MCU --</option>
+              <option value="esp32c3">ESP32-C3</option>
+              <option value="esp32s3">ESP32-S3</option>
+            </select>
+          </div>
+          <div id="hwCustomGpioContainer"></div>
+        </div>
+
+        <table id="hwStdTable" style="width:100%;border-collapse:collapse;margin:16px 0 8px">
           <thead>
             <tr style="border-bottom:1px solid #ddd">
               <th style="text-align:left;padding:6px 8px;width:60px">GPIO</th>

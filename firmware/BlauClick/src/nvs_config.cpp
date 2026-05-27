@@ -105,17 +105,20 @@ void loadHwGpioConfig() {
   prefs.begin("blau", true);
   bool hasCfg = prefs.isKey("htmpl");
   if (hasCfg) {
-    uint8_t funcMap[11] = {};
-    for (int i = 0; i <= 10; i++) {
-      char key[5]; snprintf(key, sizeof(key), "hf%d", i);
+    uint8_t funcMap[47] = {};
+    for (int i = 0; i <= 46; i++) {
+      char key[6]; snprintf(key, sizeof(key), "hf%d", i);
       funcMap[i] = prefs.getUChar(key, 0);
     }
     uint8_t tmplRaw = prefs.getUChar("htmpl", 255);
     g_hwTemplate = (tmplRaw == 255) ? -1 : (int8_t)tmplRaw;
+    String mcuStr = prefs.getString("hmcu", "");
+    strncpy(g_hwMcu, mcuStr.c_str(), sizeof(g_hwMcu) - 1);
+    g_hwMcu[sizeof(g_hwMcu) - 1] = '\0';
     prefs.end();
 
     g_pinEnVbat = g_pinVbat = g_pinBtn = g_pinBtnInv = g_pinEnBtn = g_pinLedDig = g_pinLed = PIN_UNUSED;
-    for (int i = 0; i <= 10; i++) {
+    for (int i = 0; i <= 46; i++) {
       switch ((GpioFunc)funcMap[i]) {
         case FUNC_EN_VBAT: g_pinEnVbat = i; break;
         case FUNC_VBAT:    g_pinVbat   = i; break;
@@ -130,28 +133,30 @@ void loadHwGpioConfig() {
   } else {
     prefs.end();
   }
-  Serial.printf("[HW] LED_DIG=%d LED=%d BTN=%d BTN_INV=%d EN_BTN=%d VBAT=%d EN_VBAT=%d tmpl=%d\n",
-                g_pinLedDig, g_pinLed, g_pinBtn, g_pinBtnInv, g_pinEnBtn, g_pinVbat, g_pinEnVbat, g_hwTemplate);
+  Serial.printf("[HW] LED_DIG=%d LED=%d BTN=%d BTN_INV=%d EN_BTN=%d VBAT=%d EN_VBAT=%d tmpl=%d mcu=%s\n",
+                g_pinLedDig, g_pinLed, g_pinBtn, g_pinBtnInv, g_pinEnBtn, g_pinVbat, g_pinEnVbat, g_hwTemplate, g_hwMcu);
 }
 
-void saveHwGpioConfig(uint8_t* funcMap, int8_t tmpl) {
+void saveHwGpioConfig(uint8_t* funcMap, int8_t tmpl, const char* mcu) {
   prefs.begin("blau", false);
-  for (int i = 0; i <= 10; i++) {
-    char key[5]; snprintf(key, sizeof(key), "hf%d", i);
+  for (int i = 0; i <= 46; i++) {
+    char key[6]; snprintf(key, sizeof(key), "hf%d", i);
     prefs.putUChar(key, funcMap[i]);
   }
   prefs.putUChar("htmpl", (uint8_t)(tmpl < 0 ? 255 : tmpl));
+  prefs.putString("hmcu", mcu ? mcu : "");
   prefs.end();
   Serial.println("[HW] Config hardware guardada");
 }
 
 void clearHwGpioConfig() {
   prefs.begin("blau", false);
-  for (int i = 0; i <= 10; i++) {
-    char key[5]; snprintf(key, sizeof(key), "hf%d", i);
+  for (int i = 0; i <= 46; i++) {
+    char key[6]; snprintf(key, sizeof(key), "hf%d", i);
     prefs.remove(key);
   }
   prefs.remove("htmpl");
+  prefs.remove("hmcu");
   prefs.end();
   Serial.println("[HW] Config hardware esborrada");
 }
@@ -163,8 +168,8 @@ bool hwConfigIsValid() {
     return false;
   }
   bool hasBtn = false;
-  for (int i = 0; i <= 10; i++) {
-    char key[5];
+  for (int i = 0; i <= 46; i++) {
+    char key[6];
     snprintf(key, sizeof(key), "hf%d", i);
     uint8_t f = prefs.getUChar(key, 0);
     if (f == (uint8_t)FUNC_BTN || f == (uint8_t)FUNC_BTN_INV) {

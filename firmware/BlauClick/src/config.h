@@ -129,3 +129,94 @@ inline const HwTemplate HW_TEMPLATES[] = {
     4 },
 };
 #define HW_TEMPLATE_COUNT 3
+#define HW_TMPL_CUSTOM    99
+
+// ════════════════════════════════════════════════════════════════
+//  PERFILS DE GPIO PER MICROCONTROLADOR
+// ════════════════════════════════════════════════════════════════
+
+struct GpioCaps { bool valid; bool hasPwm; bool hasAdc; bool inputOnly; };
+
+static const GpioCaps ESP32C3_GPIO_CAPS[22] = {
+  //        valid,  hasPwm,  hasAdc, inputOnly
+  {  true,  true,   true,   false },  //  0
+  {  true,  true,   true,   false },  //  1
+  {  true,  true,   true,   false },  //  2
+  {  true,  true,   true,   false },  //  3
+  {  true,  true,   true,   false },  //  4
+  {  true,  true,  false,   false },  //  5
+  {  true,  true,  false,   false },  //  6
+  {  true,  true,  false,   false },  //  7
+  {  true,  true,  false,   false },  //  8
+  {  true,  true,  false,   false },  //  9
+  {  true,  true,  false,   false },  // 10
+  {  true,  true,  false,   false },  // 11 (flash CS, amb precaucio)
+  {  true,  true,  false,   false },  // 12 (flash CLK, amb precaucio)
+  {  true,  true,  false,   false },  // 13 (flash DIO, amb precaucio)
+  {  true,  true,  false,   false },  // 14 (flash DIO, amb precaucio)
+  {  true,  true,  false,   false },  // 15 (flash DIO, amb precaucio)
+  {  true,  true,  false,   false },  // 16 (flash DIO, amb precaucio)
+  {  true,  true,  false,   false },  // 17 (flash DIO, amb precaucio)
+  {  true, false,  false,   false },  // 18 (USB D-)
+  {  true, false,  false,   false },  // 19 (USB D+)
+  {  true,  true,  false,   false },  // 20
+  {  true,  true,  false,   false },  // 21
+};
+
+static const GpioCaps ESP32S3_GPIO_CAPS[47] = {
+  //        valid,  hasPwm,  hasAdc, inputOnly
+  {  true,  true,  false,   false },  //  0 (strapping)
+  {  true,  true,   true,   false },  //  1
+  {  true,  true,   true,   false },  //  2
+  {  true,  true,   true,   false },  //  3
+  {  true,  true,   true,   false },  //  4
+  {  true,  true,   true,   false },  //  5
+  {  true,  true,   true,   false },  //  6
+  {  true,  true,   true,   false },  //  7
+  {  true,  true,   true,   false },  //  8
+  {  true,  true,   true,   false },  //  9
+  {  true,  true,   true,   false },  // 10
+  {  true,  true,  false,   false },  // 11 (PSRAM on alguns moduls)
+  {  true,  true,  false,   false },  // 12 (PSRAM on alguns moduls)
+  {  true,  true,  false,   false },  // 13 (PSRAM on alguns moduls)
+  {  true,  true,  false,   false },  // 14 (PSRAM on alguns moduls)
+  {  true,  true,  false,   false },  // 15 (PSRAM on alguns moduls)
+  {  true,  true,  false,   false },  // 16 (PSRAM on alguns moduls)
+  {  true,  true,  false,   false },  // 17 (PSRAM on alguns moduls)
+  {  true, false,  false,   false },  // 18 (USB D-)
+  {  true, false,  false,   false },  // 19 (USB D+)
+  {  true,  true,  false,   false },  // 20
+  {  true,  true,  false,   false },  // 21
+  {  true,  true,  false,   false },  // 22
+  {  true,  true,  false,   false },  // 23
+  {  true,  true,  false,   false },  // 24
+  {  true,  true,  false,   false },  // 25
+  {  true,  true,  false,   false },  // 26
+  {  true,  true,  false,   false },  // 27
+  {  true,  true,  false,   false },  // 28
+  {  true,  true,  false,   false },  // 29
+  {  true,  true,  false,   false },  // 30
+  {  true,  true,  false,   false },  // 31
+  {  true,  true,  false,   false },  // 32
+  {  true,  true,  false,   false },  // 33
+  {  true,  true,  false,   false },  // 34 (flash CS, amb precaucio)
+  {  true,  true,  false,   false },  // 35 (flash CLK, amb precaucio)
+  {  true,  true,  false,   false },  // 36 (flash DIO, amb precaucio)
+  {  true,  true,  false,   false },  // 37 (flash DIO, amb precaucio)
+  {  true,  true,  false,   false },  // 38
+  {  true,  true,  false,   false },  // 39
+  {  true,  true,  false,   false },  // 40
+  {  true,  true,  false,   false },  // 41
+  {  true,  true,  false,   false },  // 42
+  {  true,  true,  false,   false },  // 43 (UART0_TX)
+  {  true,  true,  false,   false },  // 44 (UART0_RX)
+  {  true,  true,  false,   false },  // 45 (strapping)
+  {  true, false,  false,    true },  // 46 (input only)
+};
+
+struct McuProfile { const char* id; const char* name; const GpioCaps* caps; uint8_t count; };
+inline const McuProfile MCU_PROFILES[] = {
+  { "esp32c3", "ESP32-C3", ESP32C3_GPIO_CAPS, 22 },
+  { "esp32s3", "ESP32-S3", ESP32S3_GPIO_CAPS, 47 },
+};
+#define MCU_PROFILE_COUNT 2

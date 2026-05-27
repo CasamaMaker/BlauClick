@@ -212,26 +212,25 @@ void webServerSetup() {
   #ifndef HARDCODED_CONFIG
 
   server.on("/hw_gpiomap", HTTP_GET, [](AsyncWebServerRequest *request) {
-    uint8_t funcMap[11] = {};
-    if (g_pinEnVbat >= 0 && g_pinEnVbat <= 10) funcMap[g_pinEnVbat] = FUNC_EN_VBAT;
-    if (g_pinVbat   >= 0 && g_pinVbat   <= 10) funcMap[g_pinVbat]   = FUNC_VBAT;
-    if (g_pinBtn    >= 0 && g_pinBtn    <= 10) funcMap[g_pinBtn]    = FUNC_BTN;
-    if (g_pinBtnInv >= 0 && g_pinBtnInv <= 10) funcMap[g_pinBtnInv] = FUNC_BTN_INV;
-    if (g_pinEnBtn  >= 0 && g_pinEnBtn  <= 10) funcMap[g_pinEnBtn]  = FUNC_EN_BTN;
-    if (g_pinLedDig >= 0 && g_pinLedDig <= 10) funcMap[g_pinLedDig] = FUNC_LED_DIG;
-    if (g_pinLed    >= 0 && g_pinLed    <= 10) funcMap[g_pinLed]    = FUNC_LED;
+    uint8_t funcMap[47] = {};
+    if (g_pinEnVbat >= 0 && g_pinEnVbat <= 46) funcMap[g_pinEnVbat] = FUNC_EN_VBAT;
+    if (g_pinVbat   >= 0 && g_pinVbat   <= 46) funcMap[g_pinVbat]   = FUNC_VBAT;
+    if (g_pinBtn    >= 0 && g_pinBtn    <= 46) funcMap[g_pinBtn]    = FUNC_BTN;
+    if (g_pinBtnInv >= 0 && g_pinBtnInv <= 46) funcMap[g_pinBtnInv] = FUNC_BTN_INV;
+    if (g_pinEnBtn  >= 0 && g_pinEnBtn  <= 46) funcMap[g_pinEnBtn]  = FUNC_EN_BTN;
+    if (g_pinLedDig >= 0 && g_pinLedDig <= 46) funcMap[g_pinLedDig] = FUNC_LED_DIG;
+    if (g_pinLed    >= 0 && g_pinLed    <= 46) funcMap[g_pinLed]    = FUNC_LED;
     String json = "{";
-    for (int i = 0; i <= 10; i++) {
-      json += "\"f" + String(i) + "\":" + String(funcMap[i]);
-      if (i < 10) json += ",";
+    for (int i = 0; i <= 46; i++) {
+      json += "\"f" + String(i) + "\":" + String(funcMap[i]) + ",";
     }
-    json += ",\"tmpl\":" + String(g_hwTemplate) + "}";
+    json += "\"tmpl\":" + String(g_hwTemplate) + ",\"mcu\":\"" + String(g_hwMcu) + "\"}";
     request->send(200, "application/json", json);
   });
 
   server.on("/hw_gpiomap", HTTP_POST, [](AsyncWebServerRequest *request) {
-    uint8_t funcMap[11] = {};
-    for (int i = 0; i <= 10; i++) {
+    uint8_t funcMap[47] = {};
+    for (int i = 0; i <= 46; i++) {
       String key = "f" + String(i);
       if (request->hasParam(key, true))
         funcMap[i] = (uint8_t)request->getParam(key, true)->value().toInt();
@@ -239,7 +238,10 @@ void webServerSetup() {
     int8_t tmpl = -1;
     if (request->hasParam("tmpl", true))
       tmpl = (int8_t)request->getParam("tmpl", true)->value().toInt();
-    saveHwGpioConfig(funcMap, tmpl);
+    String mcu = "";
+    if (request->hasParam("mcu", true))
+      mcu = request->getParam("mcu", true)->value();
+    saveHwGpioConfig(funcMap, tmpl, mcu.c_str());
     request->send(200, "text/plain", "OK");
     delay(200);
     ESP.restart();
@@ -268,6 +270,26 @@ void webServerSetup() {
       json += "{\"id\":" + String(f) +
               ",\"label\":\"" + String(FUNC_LIST[f].label) +
               "\",\"isInput\":" + String(FUNC_LIST[f].isInput ? "true" : "false") + "}";
+    }
+    json += "]";
+    request->send(200, "application/json", json);
+  });
+
+  server.on("/hw_gpiocaps", HTTP_GET, [](AsyncWebServerRequest *request) {
+    String json = "[";
+    for (int m = 0; m < MCU_PROFILE_COUNT; m++) {
+      if (m > 0) json += ",";
+      json += "{\"id\":\"" + String(MCU_PROFILES[m].id) +
+              "\",\"name\":\"" + String(MCU_PROFILES[m].name) + "\",\"caps\":[";
+      for (int g = 0; g < MCU_PROFILES[m].count; g++) {
+        if (g > 0) json += ",";
+        const GpioCaps& c = MCU_PROFILES[m].caps[g];
+        json += "{\"valid\":"    + String(c.valid     ? "true" : "false") +
+                ",\"hasPwm\":"  + String(c.hasPwm    ? "true" : "false") +
+                ",\"hasAdc\":"  + String(c.hasAdc    ? "true" : "false") +
+                ",\"inputOnly\":" + String(c.inputOnly ? "true" : "false") + "}";
+      }
+      json += "]}";
     }
     json += "]";
     request->send(200, "application/json", json);

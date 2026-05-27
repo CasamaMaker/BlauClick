@@ -54,3 +54,4 @@ extern int g_pinEnBtn;
 extern int g_pinLedDig;
 extern int g_pinLed;
 extern int8_t g_hwTemplate;
+extern char   g_hwMcu[10];

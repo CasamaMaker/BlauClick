@@ -32,6 +32,14 @@
       x.open("GET", "/hw_funclist", true); x.send();
     }
 
+    function apiGetHwGpioCaps(cb) {
+      var x = new XMLHttpRequest();
+      x.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) cb(JSON.parse(this.responseText));
+      };
+      x.open("GET", "/hw_gpiocaps", true); x.send();
+    }
+
     function apiClearHwConfig(cb) {
       var x = new XMLHttpRequest();
       x.onreadystatechange = function() {

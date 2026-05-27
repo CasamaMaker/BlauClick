@@ -41,6 +41,7 @@ int g_pinEnBtn   = PIN_UNUSED;
 int g_pinLedDig  = PIN_UNUSED;
 int g_pinLed     = PIN_UNUSED;
 int8_t g_hwTemplate = -1;
+char   g_hwMcu[10]  = {};
 
 // ── LED ──────────────────────────────────────────────────────────
 Adafruit_NeoPixel strip(NUM_LEDS, PIN_UNUSED, NEO_GRB + NEO_KHZ800);
