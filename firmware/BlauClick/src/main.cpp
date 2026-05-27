@@ -94,8 +94,8 @@ void setup() {
 
   loadHwGpioConfig();  // sobreescriu g_pin* des de NVS (o manté defaults de compilació)
 
-  if (g_pinBtn    != PIN_UNUSED) pinMode(g_pinBtn,    INPUT_PULLUP);
-  if (g_pinBtnInv != PIN_UNUSED) pinMode(g_pinBtnInv, INPUT_PULLDOWN);
+  if (g_pinBtn    != PIN_UNUSED) pinMode(g_pinBtn,    INPUT_PULLDOWN);
+  if (g_pinBtnInv != PIN_UNUSED) pinMode(g_pinBtnInv, INPUT_PULLUP);
   if (g_pinEnBtn  != PIN_UNUSED) { pinMode(g_pinEnBtn, OUTPUT); digitalWrite(g_pinEnBtn, HIGH); }
 
   Serial.println("[BOOT] inici BlauClick " FIRMWARE_VERSION);
@@ -221,15 +221,15 @@ void loop() {
         }
       }
 
-      static bool lastIdle = false;
-      bool nowIdle = btnIsIdle();
+      static bool lastHeld = true;   // botó premut al entrar al mode AP
+      bool nowHeld = btnIsIdle();
 
-      if (nowIdle && !lastIdle && !buttonReleased) {
+      if (!nowHeld && lastHeld && !buttonReleased) {
         buttonReleased = true;
         Serial.println("[BTN] Boto alliberat");
         delay(200);
       }
-      if (!nowIdle && lastIdle && buttonReleased) {
+      if (nowHeld && !lastHeld && buttonReleased) {
         Serial.println("[BTN] Boto premut despres d'alliberar -> apagant");
         delay(200);
         if (g_pinEnBtn != PIN_UNUSED) {
@@ -238,7 +238,7 @@ void loop() {
           esp_deep_sleep_start();
         }
       }
-      lastIdle = nowIdle;
+      lastHeld = nowHeld;
     }
   }
 }

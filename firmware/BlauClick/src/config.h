@@ -107,10 +107,10 @@ inline const GpioFuncEntry FUNC_LIST[FUNC_COUNT] = {
   { FUNC_NONE,    "Sense funci\xC3\xB3",   false },
   { FUNC_EN_VBAT, "Habilita lectura bateria",       false },
   { FUNC_VBAT,    "Lectura bateria",        true  },
-  { FUNC_BTN,     "Bot\xC3\xB3 (pull-up)", true  },
+  { FUNC_BTN,     "Bot\xC3\xB3 (pull-down)", true  },
   { FUNC_LED_DIG, "Led digital",            false },
   { FUNC_EN_BTN,  "Habilita LDO/uC",           false },
-  { FUNC_BTN_INV, "Bot\xC3\xB3 invertit",  true  },
+  { FUNC_BTN_INV, "Bot\xC3\xB3 (pull-up)",  true  },
   { FUNC_LED,     "Led on/off",             false },
 };
 
