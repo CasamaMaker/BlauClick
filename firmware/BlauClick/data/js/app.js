@@ -223,6 +223,10 @@
       fetchMac();
       // simulateBattery();  // Para demo, usar batería simulada
       fetchBatteryLevel();  //per llegir info real de bateria
+      apiGetInfo(function(info) {
+        var el = document.getElementById('firmwareVersion');
+        if (el && info.version) el.textContent = 'BlauClick ' + info.version + ' | Martí Casamayor';
+      });
       fetchMacList();
       initCmdCard();
 

@@ -51,6 +51,14 @@
     }
 
     // Nueva función para desconectar WiFi AP
+    function apiGetInfo(cb) {
+      var x = new XMLHttpRequest();
+      x.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) cb(JSON.parse(this.responseText));
+      };
+      x.open("GET", "/info", true); x.send();
+    }
+
     function disconnectWiFiAP() {
       var xhttp = new XMLHttpRequest();
       xhttp.onreadystatechange = function() {
