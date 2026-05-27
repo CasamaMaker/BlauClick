@@ -49,6 +49,8 @@ extern Preferences prefs;
 extern int g_pinEnVbat;
 extern int g_pinVbat;
 extern int g_pinBtn;
+extern int g_pinBtnInv;
 extern int g_pinEnBtn;
+extern int g_pinLedDig;
 extern int g_pinLed;
 extern int8_t g_hwTemplate;

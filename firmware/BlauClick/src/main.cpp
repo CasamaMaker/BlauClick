@@ -36,7 +36,9 @@
 int g_pinEnVbat  = PIN_UNUSED;
 int g_pinVbat    = PIN_UNUSED;
 int g_pinBtn     = PIN_UNUSED;
+int g_pinBtnInv  = PIN_UNUSED;
 int g_pinEnBtn   = PIN_UNUSED;
+int g_pinLedDig  = PIN_UNUSED;
 int g_pinLed     = PIN_UNUSED;
 int8_t g_hwTemplate = -1;
 
@@ -92,8 +94,9 @@ void setup() {
 
   loadHwGpioConfig();  // sobreescriu g_pin* des de NVS (o manté defaults de compilació)
 
-  if (g_pinBtn != PIN_UNUSED)   pinMode(g_pinBtn, INPUT);
-  if (g_pinEnBtn != PIN_UNUSED) { pinMode(g_pinEnBtn, OUTPUT); digitalWrite(g_pinEnBtn, HIGH); }
+  if (g_pinBtn    != PIN_UNUSED) pinMode(g_pinBtn,    INPUT_PULLUP);
+  if (g_pinBtnInv != PIN_UNUSED) pinMode(g_pinBtnInv, INPUT_PULLDOWN);
+  if (g_pinEnBtn  != PIN_UNUSED) { pinMode(g_pinEnBtn, OUTPUT); digitalWrite(g_pinEnBtn, HIGH); }
 
   Serial.println("[BOOT] inici BlauClick " FIRMWARE_VERSION);
 
@@ -118,13 +121,14 @@ void setup() {
   Serial.printf("[BATT] %.2fV  %d%%  charging=%s\n",
                 batteryVoltage, batteryLevel, isCharging ? "yes" : "no");
 
-  if (g_pinLed != PIN_UNUSED) {
-    strip.setPin(g_pinLed);
+  if (g_pinLedDig != PIN_UNUSED) {
+    strip.setPin(g_pinLedDig);
     strip.begin();
     strip.setBrightness(map(BRIGHTNESS_DEF, 0, 100, 0, 255));
     strip.clear();
     strip.show();
   }
+  if (g_pinLed != PIN_UNUSED) { pinMode(g_pinLed, OUTPUT); digitalWrite(g_pinLed, LOW); }
 
   #ifndef HARDCODED_CONFIG
   if (!hwConfigIsValid()) {
@@ -174,7 +178,13 @@ void setup() {
 // ════════════════════════════════════════════════════════════════
 
 void loop() {
-  if (digitalRead(g_pinBtn)) {
+  auto btnIsIdle = [&]() -> bool {
+    if (g_pinBtn    != PIN_UNUSED) return  digitalRead(g_pinBtn);    // HIGH = no premut (pull-up)
+    if (g_pinBtnInv != PIN_UNUSED) return !digitalRead(g_pinBtnInv); // LOW  = no premut (pull-down)
+    return true;
+  };
+
+  if (btnIsIdle()) {
     strip.clear();
     strip.show();
     delay(100);
@@ -211,17 +221,16 @@ void loop() {
         }
       }
 
-      static bool lastButtonState = HIGH;
-      bool buttonState = digitalRead(g_pinBtn);
+      static bool lastIdle = false;
+      bool nowIdle = btnIsIdle();
 
-      if (buttonState == LOW && lastButtonState == HIGH && !buttonReleased) {
+      if (nowIdle && !lastIdle && !buttonReleased) {
         buttonReleased = true;
         Serial.println("[BTN] Boto alliberat");
         delay(200);
       }
-      if (buttonState == HIGH && lastButtonState == LOW && buttonReleased) {
+      if (!nowIdle && lastIdle && buttonReleased) {
         Serial.println("[BTN] Boto premut despres d'alliberar -> apagant");
-        buttonReleased = false;
         delay(200);
         if (g_pinEnBtn != PIN_UNUSED) {
           digitalWrite(g_pinEnBtn, LOW);
@@ -229,7 +238,7 @@ void loop() {
           esp_deep_sleep_start();
         }
       }
-      lastButtonState = buttonState;
+      lastIdle = nowIdle;
     }
   }
 }

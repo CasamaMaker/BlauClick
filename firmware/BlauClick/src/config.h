@@ -89,11 +89,13 @@ enum GpioFunc : uint8_t {
   FUNC_NONE    = 0,   // Sense funció
   FUNC_EN_VBAT = 1,   // Habilita bateria  (Digital OUT)
   FUNC_VBAT    = 2,   // Lectura bateria   (ADC IN)
-  FUNC_BTN     = 3,   // Botó              (Digital IN)
-  FUNC_LED     = 4,   // Led digital       (Digital OUT)
+  FUNC_BTN     = 3,   // Botó pull-up      (Digital IN, actiu LOW)
+  FUNC_LED_DIG = 4,   // Led digital       (NeoPixel/WS2812)
   FUNC_EN_BTN  = 5,   // Habilita LDO      (Digital OUT)
+  FUNC_BTN_INV = 6,   // Botó pull-down    (Digital IN, actiu HIGH)
+  FUNC_LED     = 7,   // Led on/off        (Digital OUT)
 };
-#define FUNC_COUNT 6
+#define FUNC_COUNT 8
 
 struct GpioFuncEntry {
   GpioFunc    func;
@@ -102,12 +104,14 @@ struct GpioFuncEntry {
 };
 
 inline const GpioFuncEntry FUNC_LIST[FUNC_COUNT] = {
-  { FUNC_NONE,    "Sense funci\xC3\xB3", false },
-  { FUNC_EN_VBAT, "Habilita bateria",    false },
-  { FUNC_VBAT,    "Lectura bateria",     true  },
-  { FUNC_BTN,     "Bot\xC3\xB3",         true  },
-  { FUNC_LED,     "Led digital",         false },
-  { FUNC_EN_BTN,  "Habilita LDO",        false },
+  { FUNC_NONE,    "Sense funci\xC3\xB3",   false },
+  { FUNC_EN_VBAT, "Habilita lectura bateria",       false },
+  { FUNC_VBAT,    "Lectura bateria",        true  },
+  { FUNC_BTN,     "Bot\xC3\xB3 (pull-up)", true  },
+  { FUNC_LED_DIG, "Led digital",            false },
+  { FUNC_EN_BTN,  "Habilita LDO/uC",           false },
+  { FUNC_BTN_INV, "Bot\xC3\xB3 invertit",  true  },
+  { FUNC_LED,     "Led on/off",             false },
 };
 
 struct GpioPinTemplate { uint8_t gpio; GpioFunc func; };
@@ -115,13 +119,13 @@ struct HwTemplate       { const char* name; GpioPinTemplate pins[6]; uint8_t cou
 
 inline const HwTemplate HW_TEMPLATES[] = {
   { "BlauClick V1",
-    {{ 4, FUNC_EN_VBAT }, { 3, FUNC_VBAT }, { 5, FUNC_BTN }, { 6, FUNC_LED }},
+    {{ 4, FUNC_EN_VBAT }, { 3, FUNC_VBAT }, { 5, FUNC_BTN }, { 6, FUNC_LED_DIG }},
     4 },
   { "BlauClick V2",
-    {{ 0, FUNC_EN_VBAT }, { 3, FUNC_VBAT }, { 1, FUNC_BTN }, { 4, FUNC_EN_BTN }, { 5, FUNC_LED }},
+    {{ 0, FUNC_EN_VBAT }, { 3, FUNC_VBAT }, { 1, FUNC_BTN }, { 4, FUNC_EN_BTN }, { 5, FUNC_LED_DIG }},
     5 },
   { "PICO Click",
-    {{ 4, FUNC_VBAT }, { 5, FUNC_BTN }, { 3, FUNC_EN_BTN }, { 6, FUNC_LED }},
+    {{ 4, FUNC_VBAT }, { 5, FUNC_BTN }, { 3, FUNC_EN_BTN }, { 6, FUNC_LED_DIG }},
     4 },
 };
 #define HW_TEMPLATE_COUNT 3

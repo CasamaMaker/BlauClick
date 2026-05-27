@@ -216,7 +216,9 @@ void webServerSetup() {
     if (g_pinEnVbat >= 0 && g_pinEnVbat <= 10) funcMap[g_pinEnVbat] = FUNC_EN_VBAT;
     if (g_pinVbat   >= 0 && g_pinVbat   <= 10) funcMap[g_pinVbat]   = FUNC_VBAT;
     if (g_pinBtn    >= 0 && g_pinBtn    <= 10) funcMap[g_pinBtn]    = FUNC_BTN;
+    if (g_pinBtnInv >= 0 && g_pinBtnInv <= 10) funcMap[g_pinBtnInv] = FUNC_BTN_INV;
     if (g_pinEnBtn  >= 0 && g_pinEnBtn  <= 10) funcMap[g_pinEnBtn]  = FUNC_EN_BTN;
+    if (g_pinLedDig >= 0 && g_pinLedDig <= 10) funcMap[g_pinLedDig] = FUNC_LED_DIG;
     if (g_pinLed    >= 0 && g_pinLed    <= 10) funcMap[g_pinLed]    = FUNC_LED;
     String json = "{";
     for (int i = 0; i <= 10; i++) {

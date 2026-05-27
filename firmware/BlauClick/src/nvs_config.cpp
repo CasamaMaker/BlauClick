@@ -114,13 +114,15 @@ void loadHwGpioConfig() {
     g_hwTemplate = (tmplRaw == 255) ? -1 : (int8_t)tmplRaw;
     prefs.end();
 
-    g_pinEnVbat = g_pinVbat = g_pinBtn = g_pinEnBtn = g_pinLed = PIN_UNUSED;
+    g_pinEnVbat = g_pinVbat = g_pinBtn = g_pinBtnInv = g_pinEnBtn = g_pinLedDig = g_pinLed = PIN_UNUSED;
     for (int i = 0; i <= 10; i++) {
       switch ((GpioFunc)funcMap[i]) {
         case FUNC_EN_VBAT: g_pinEnVbat = i; break;
         case FUNC_VBAT:    g_pinVbat   = i; break;
         case FUNC_BTN:     g_pinBtn    = i; break;
         case FUNC_EN_BTN:  g_pinEnBtn  = i; break;
+        case FUNC_LED_DIG: g_pinLedDig = i; break;
+        case FUNC_BTN_INV: g_pinBtnInv = i; break;
         case FUNC_LED:     g_pinLed    = i; break;
         default: break;
       }
@@ -128,8 +130,8 @@ void loadHwGpioConfig() {
   } else {
     prefs.end();
   }
-  Serial.printf("[HW] LED=%d BTN=%d EN_BTN=%d VBAT=%d EN_VBAT=%d tmpl=%d\n",
-                g_pinLed, g_pinBtn, g_pinEnBtn, g_pinVbat, g_pinEnVbat, g_hwTemplate);
+  Serial.printf("[HW] LED_DIG=%d LED=%d BTN=%d BTN_INV=%d EN_BTN=%d VBAT=%d EN_VBAT=%d tmpl=%d\n",
+                g_pinLedDig, g_pinLed, g_pinBtn, g_pinBtnInv, g_pinEnBtn, g_pinVbat, g_pinEnVbat, g_hwTemplate);
 }
 
 void saveHwGpioConfig(uint8_t* funcMap, int8_t tmpl) {
@@ -164,7 +166,8 @@ bool hwConfigIsValid() {
   for (int i = 0; i <= 10; i++) {
     char key[5];
     snprintf(key, sizeof(key), "hf%d", i);
-    if (prefs.getUChar(key, 0) == (uint8_t)FUNC_BTN) {
+    uint8_t f = prefs.getUChar(key, 0);
+    if (f == (uint8_t)FUNC_BTN || f == (uint8_t)FUNC_BTN_INV) {
       hasBtn = true;
       break;
     }
@@ -188,8 +191,8 @@ void setCachedChannel(uint8_t) {}
 
 void loadHwGpioConfig() {
   // En mode HARDCODED els g_pin* queden a PIN_UNUSED (sense configuració de hardware)
-  Serial.printf("[HW] HARDCODED: LED=%d BTN=%d EN_BTN=%d VBAT=%d EN_VBAT=%d\n",
-                g_pinLed, g_pinBtn, g_pinEnBtn, g_pinVbat, g_pinEnVbat);
+  Serial.printf("[HW] HARDCODED: LED_DIG=%d LED=%d BTN=%d BTN_INV=%d EN_BTN=%d VBAT=%d EN_VBAT=%d\n",
+                g_pinLedDig, g_pinLed, g_pinBtn, g_pinBtnInv, g_pinEnBtn, g_pinVbat, g_pinEnVbat);
 }
 
 #endif
