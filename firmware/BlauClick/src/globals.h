@@ -44,3 +44,11 @@ extern bool  isCharging;
 #ifndef HARDCODED_CONFIG
 extern Preferences prefs;
 #endif
+
+// ── Pins dinàmics de hardware ────────────────────────────────────
+extern int g_pinEnVbat;
+extern int g_pinVbat;
+extern int g_pinBtn;
+extern int g_pinEnBtn;
+extern int g_pinLed;
+extern int8_t g_hwTemplate;

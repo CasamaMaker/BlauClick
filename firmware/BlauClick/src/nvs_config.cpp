@@ -101,6 +101,78 @@ void setCachedChannel(uint8_t ch) {
   }
 }
 
+void loadHwGpioConfig() {
+  prefs.begin("blau", true);
+  bool hasCfg = prefs.isKey("htmpl");
+  if (hasCfg) {
+    uint8_t funcMap[11] = {};
+    for (int i = 0; i <= 10; i++) {
+      char key[5]; snprintf(key, sizeof(key), "hf%d", i);
+      funcMap[i] = prefs.getUChar(key, 0);
+    }
+    uint8_t tmplRaw = prefs.getUChar("htmpl", 255);
+    g_hwTemplate = (tmplRaw == 255) ? -1 : (int8_t)tmplRaw;
+    prefs.end();
+
+    g_pinEnVbat = g_pinVbat = g_pinBtn = g_pinEnBtn = g_pinLed = PIN_UNUSED;
+    for (int i = 0; i <= 10; i++) {
+      switch ((GpioFunc)funcMap[i]) {
+        case FUNC_EN_VBAT: g_pinEnVbat = i; break;
+        case FUNC_VBAT:    g_pinVbat   = i; break;
+        case FUNC_BTN:     g_pinBtn    = i; break;
+        case FUNC_EN_BTN:  g_pinEnBtn  = i; break;
+        case FUNC_LED:     g_pinLed    = i; break;
+        default: break;
+      }
+    }
+  } else {
+    prefs.end();
+  }
+  Serial.printf("[HW] LED=%d BTN=%d EN_BTN=%d VBAT=%d EN_VBAT=%d tmpl=%d\n",
+                g_pinLed, g_pinBtn, g_pinEnBtn, g_pinVbat, g_pinEnVbat, g_hwTemplate);
+}
+
+void saveHwGpioConfig(uint8_t* funcMap, int8_t tmpl) {
+  prefs.begin("blau", false);
+  for (int i = 0; i <= 10; i++) {
+    char key[5]; snprintf(key, sizeof(key), "hf%d", i);
+    prefs.putUChar(key, funcMap[i]);
+  }
+  prefs.putUChar("htmpl", (uint8_t)(tmpl < 0 ? 255 : tmpl));
+  prefs.end();
+  Serial.println("[HW] Config hardware guardada");
+}
+
+void clearHwGpioConfig() {
+  prefs.begin("blau", false);
+  for (int i = 0; i <= 10; i++) {
+    char key[5]; snprintf(key, sizeof(key), "hf%d", i);
+    prefs.remove(key);
+  }
+  prefs.remove("htmpl");
+  prefs.end();
+  Serial.println("[HW] Config hardware esborrada");
+}
+
+bool hwConfigIsValid() {
+  prefs.begin("blau", true);
+  if (!prefs.isKey("htmpl")) {
+    prefs.end();
+    return false;
+  }
+  bool hasBtn = false;
+  for (int i = 0; i <= 10; i++) {
+    char key[5];
+    snprintf(key, sizeof(key), "hf%d", i);
+    if (prefs.getUChar(key, 0) == (uint8_t)FUNC_BTN) {
+      hasBtn = true;
+      break;
+    }
+  }
+  prefs.end();
+  return hasBtn;
+}
+
 #else
 
 // Mode HARDCODED: MAC i canal venen de config.h, NVS no s'usa
@@ -113,5 +185,11 @@ void readAllConfigs() {
 
 uint8_t getCachedChannel() { return HC_CHANNEL; }
 void setCachedChannel(uint8_t) {}
+
+void loadHwGpioConfig() {
+  // En mode HARDCODED els g_pin* queden a PIN_UNUSED (sense configuració de hardware)
+  Serial.printf("[HW] HARDCODED: LED=%d BTN=%d EN_BTN=%d VBAT=%d EN_VBAT=%d\n",
+                g_pinLed, g_pinBtn, g_pinEnBtn, g_pinVbat, g_pinEnVbat);
+}
 
 #endif

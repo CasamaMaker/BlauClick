@@ -1,45 +1,9 @@
 #pragma once
 
 // ════════════════════════════════════════════════════════════════
-//  SELECCIÓ DEL DISPOSITIU  (descomenta un sol)
-// ════════════════════════════════════════════════════════════════
-// #define BLAUCLICK_V1
-#define BLAUCLICK_V2
-// #define PICO_CLICK
-
-
-// ════════════════════════════════════════════════════════════════
 //  PINOUT I CONFIGURACIÓ DE HARDWARE
 // ════════════════════════════════════════════════════════════════
 #define PIN_UNUSED  -1   // pin no connectat / no utilitzat
-
-#if defined(BLAUCLICK_V1)
-  #define PIN_EN_VBAT  4
-  #define PIN_VBAT     3
-  #define PIN_BOTO     5
-  #define PIN_EN_BOTO  PIN_UNUSED   // V1 usa deep sleep en lloc d'LDO
-  #define PIN_LED      6
-  #define PIN_CHARGE   PIN_UNUSED
-
-#elif defined(BLAUCLICK_V2)
-  #define PIN_EN_VBAT  0
-  #define PIN_VBAT     3
-  #define PIN_BOTO     1
-  #define PIN_EN_BOTO  4
-  #define PIN_LED      5
-  #define PIN_CHARGE   PIN_UNUSED
-
-#elif defined(PICO_CLICK)
-  #define PIN_EN_VBAT  PIN_UNUSED   // No implementat
-  #define PIN_VBAT     4
-  #define PIN_BOTO     5
-  #define PIN_EN_BOTO  3
-  #define PIN_LED      6
-  #define PIN_CHARGE   PIN_UNUSED
-
-#else
-  #error "Defineix una versió del dispositiu a config.h (BLAUCLICK_V1, BLAUCLICK_V2 o PICO_CLICK)"
-#endif
 
 
 // ════════════════════════════════════════════════════════════════
@@ -115,3 +79,49 @@
 #define WIFI_AP_TIMEOUT_MS   60000   // ms màxims en mode AP abans d'apagar el dispositiu
 #define HTTP_PORT               80
 #define DNS_PORT                53
+
+
+// ════════════════════════════════════════════════════════════════
+//  CONFIGURACIÓ HARDWARE DINÀMICA
+// ════════════════════════════════════════════════════════════════
+
+enum GpioFunc : uint8_t {
+  FUNC_NONE    = 0,   // Sense funció
+  FUNC_EN_VBAT = 1,   // Habilita bateria  (Digital OUT)
+  FUNC_VBAT    = 2,   // Lectura bateria   (ADC IN)
+  FUNC_BTN     = 3,   // Botó              (Digital IN)
+  FUNC_LED     = 4,   // Led digital       (Digital OUT)
+  FUNC_EN_BTN  = 5,   // Habilita LDO      (Digital OUT)
+};
+#define FUNC_COUNT 6
+
+struct GpioFuncEntry {
+  GpioFunc    func;
+  const char* label;
+  bool        isInput;
+};
+
+inline const GpioFuncEntry FUNC_LIST[FUNC_COUNT] = {
+  { FUNC_NONE,    "Sense funci\xC3\xB3", false },
+  { FUNC_EN_VBAT, "Habilita bateria",    false },
+  { FUNC_VBAT,    "Lectura bateria",     true  },
+  { FUNC_BTN,     "Bot\xC3\xB3",         true  },
+  { FUNC_LED,     "Led digital",         false },
+  { FUNC_EN_BTN,  "Habilita LDO",        false },
+};
+
+struct GpioPinTemplate { uint8_t gpio; GpioFunc func; };
+struct HwTemplate       { const char* name; GpioPinTemplate pins[6]; uint8_t count; };
+
+inline const HwTemplate HW_TEMPLATES[] = {
+  { "BlauClick V1",
+    {{ 4, FUNC_EN_VBAT }, { 3, FUNC_VBAT }, { 5, FUNC_BTN }, { 6, FUNC_LED }},
+    4 },
+  { "BlauClick V2",
+    {{ 0, FUNC_EN_VBAT }, { 3, FUNC_VBAT }, { 1, FUNC_BTN }, { 4, FUNC_EN_BTN }, { 5, FUNC_LED }},
+    5 },
+  { "PICO Click",
+    {{ 4, FUNC_VBAT }, { 5, FUNC_BTN }, { 3, FUNC_EN_BTN }, { 6, FUNC_LED }},
+    4 },
+};
+#define HW_TEMPLATE_COUNT 3

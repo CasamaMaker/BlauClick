@@ -123,8 +123,8 @@
           <div class="cmd-item" data-value="1" onclick="selectCmd(this)" data-i18n="cmdToggle">Toggle</div>
           <div class="cmd-item" data-value="2" onclick="selectCmd(this)" data-i18n="cmdOn">On</div>
           <div class="cmd-item" data-value="3" onclick="selectCmd(this)" data-i18n="cmdOff">Off</div>
-          <div class="cmd-item" data-value="4" onclick="selectCmd(this)" data-i18n="cmdSetBrightness">Set Brightness</div>
-          <div class="cmd-item" data-value="5" onclick="selectCmd(this)" data-i18n="cmdSetRgb">RGB</div>
+          <div class="cmd-item cmd-item-disabled" data-value="4" onclick="selectCmd(this)" data-i18n="cmdSetBrightness">Set Brightness</div>
+          <div class="cmd-item cmd-item-disabled" data-value="5" onclick="selectCmd(this)" data-i18n="cmdSetRgb">RGB</div>
           <div class="cmd-item cmd-item-disabled" data-value="6" data-i18n="cmdSetCct">CCT</div>
           <div class="cmd-item cmd-item-disabled" data-value="7" data-i18n="cmdSetScene">Scene</div>
           <div class="cmd-item cmd-item-disabled" data-value="8" data-i18n="cmdDimUp">Up</div>
@@ -186,7 +186,30 @@
       <button class="back-btn" onclick="showPage('page-configuracio')" data-i18n="navBack">&#8592; Enrere</button>
       <div class="card">
         <label data-i18n="navHardware">Hardware</label>
-        <p data-i18n="comingSoon">Pròximament...</p>
+
+        <div class="form-row" style="margin-top:12px">
+          <label style="display:block;margin-bottom:4px;font-weight:600">Plantilla de dispositiu</label>
+          <select id="hwTemplateSelect" onchange="hwApplyTemplate(this.value)" style="width:100%">
+            <option value="-1">-- Sense plantilla --</option>
+          </select>
+        </div>
+
+        <table style="width:100%;border-collapse:collapse;margin:16px 0 8px">
+          <thead>
+            <tr style="border-bottom:1px solid #ddd">
+              <th style="text-align:left;padding:6px 8px;width:60px">GPIO</th>
+              <th style="text-align:left;padding:6px 8px">Funci&#xF3;</th>
+            </tr>
+          </thead>
+          <tbody id="hwGpioTableBody"></tbody>
+        </table>
+
+        <div id="hwValidationMsg" style="color:#e74c3c;font-size:0.88em;margin:8px 0;display:none"></div>
+
+        <div style="display:flex;gap:8px;margin-top:14px">
+          <button class="btn" id="hwSaveBtn" onclick="hwSave()">Guardar configuraci&#xF3;</button>
+          <button class="btn" style="background:#c0392b" onclick="hwConfirmClear()">Esborrar configuraci&#xF3;</button>
+        </div>
       </div>
     </div>
 

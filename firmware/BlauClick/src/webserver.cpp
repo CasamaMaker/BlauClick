@@ -106,17 +106,9 @@ void webServerSetup() {
     #endif
   });
 
-  // Retorna versió firmware, variant i MAC pròpia
+  // Retorna versió firmware i MAC pròpia
   server.on("/info", HTTP_GET, [](AsyncWebServerRequest *request) {
-    #if defined(BLAUCLICK_V1)
-      const char* variant = "V1";
-    #elif defined(BLAUCLICK_V2)
-      const char* variant = "V2";
-    #elif defined(PICO_CLICK)
-      const char* variant = "PICO_CLICK";
-    #endif
     String json = "{\"version\":\"" + String(FIRMWARE_VERSION) + "\","
-                  "\"variant\":\"" + String(variant) + "\","
                   "\"mac\":\"" + myAddresssDoted + "\"}";
     request->send(200, "application/json", json);
   });
@@ -144,8 +136,8 @@ void webServerSetup() {
   server.on("/disconnect-ap", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(200, "text/plain", "Disconnecting WiFi AP...");
     delay(1000);
-    if (PIN_EN_BOTO != PIN_UNUSED) {
-      digitalWrite(PIN_EN_BOTO, LOW);
+    if (g_pinEnBtn != PIN_UNUSED) {
+      digitalWrite(g_pinEnBtn, LOW);
     } else {
       esp_deep_sleep_start();
     }
@@ -179,8 +171,8 @@ void webServerSetup() {
     #endif
     request->send(200, "text/plain", "Configurat! Ja pots provar");
     delay(1000);
-    if (PIN_EN_BOTO != PIN_UNUSED) {
-      digitalWrite(PIN_EN_BOTO, LOW);
+    if (g_pinEnBtn != PIN_UNUSED) {
+      digitalWrite(g_pinEnBtn, LOW);
     } else {
       esp_deep_sleep_start();
     }
@@ -215,6 +207,78 @@ void webServerSetup() {
     delay(500);
     ESP.restart();
   });
+
+  // ── Config hardware dinàmica ──────────────────────────────────
+  #ifndef HARDCODED_CONFIG
+
+  server.on("/hw_gpiomap", HTTP_GET, [](AsyncWebServerRequest *request) {
+    uint8_t funcMap[11] = {};
+    if (g_pinEnVbat >= 0 && g_pinEnVbat <= 10) funcMap[g_pinEnVbat] = FUNC_EN_VBAT;
+    if (g_pinVbat   >= 0 && g_pinVbat   <= 10) funcMap[g_pinVbat]   = FUNC_VBAT;
+    if (g_pinBtn    >= 0 && g_pinBtn    <= 10) funcMap[g_pinBtn]    = FUNC_BTN;
+    if (g_pinEnBtn  >= 0 && g_pinEnBtn  <= 10) funcMap[g_pinEnBtn]  = FUNC_EN_BTN;
+    if (g_pinLed    >= 0 && g_pinLed    <= 10) funcMap[g_pinLed]    = FUNC_LED;
+    String json = "{";
+    for (int i = 0; i <= 10; i++) {
+      json += "\"f" + String(i) + "\":" + String(funcMap[i]);
+      if (i < 10) json += ",";
+    }
+    json += ",\"tmpl\":" + String(g_hwTemplate) + "}";
+    request->send(200, "application/json", json);
+  });
+
+  server.on("/hw_gpiomap", HTTP_POST, [](AsyncWebServerRequest *request) {
+    uint8_t funcMap[11] = {};
+    for (int i = 0; i <= 10; i++) {
+      String key = "f" + String(i);
+      if (request->hasParam(key, true))
+        funcMap[i] = (uint8_t)request->getParam(key, true)->value().toInt();
+    }
+    int8_t tmpl = -1;
+    if (request->hasParam("tmpl", true))
+      tmpl = (int8_t)request->getParam("tmpl", true)->value().toInt();
+    saveHwGpioConfig(funcMap, tmpl);
+    request->send(200, "text/plain", "OK");
+    delay(200);
+    ESP.restart();
+  });
+
+  server.on("/hw_templates", HTTP_GET, [](AsyncWebServerRequest *request) {
+    String json = "[";
+    for (int t = 0; t < HW_TEMPLATE_COUNT; t++) {
+      if (t > 0) json += ",";
+      json += "{\"name\":\"" + String(HW_TEMPLATES[t].name) + "\",\"pins\":[";
+      for (int p = 0; p < HW_TEMPLATES[t].count; p++) {
+        if (p > 0) json += ",";
+        json += "{\"gpio\":" + String(HW_TEMPLATES[t].pins[p].gpio) +
+                ",\"func\":" + String(HW_TEMPLATES[t].pins[p].func) + "}";
+      }
+      json += "]}";
+    }
+    json += "]";
+    request->send(200, "application/json", json);
+  });
+
+  server.on("/hw_funclist", HTTP_GET, [](AsyncWebServerRequest *request) {
+    String json = "[";
+    for (int f = 0; f < FUNC_COUNT; f++) {
+      if (f > 0) json += ",";
+      json += "{\"id\":" + String(f) +
+              ",\"label\":\"" + String(FUNC_LIST[f].label) +
+              "\",\"isInput\":" + String(FUNC_LIST[f].isInput ? "true" : "false") + "}";
+    }
+    json += "]";
+    request->send(200, "application/json", json);
+  });
+
+  server.on("/hw_clear", HTTP_POST, [](AsyncWebServerRequest *request) {
+    clearHwGpioConfig();
+    request->send(200, "text/plain", "OK");
+    delay(200);
+    ESP.restart();
+  });
+
+  #endif
 
   server.onNotFound(serveixWifiManager);
   server.begin();

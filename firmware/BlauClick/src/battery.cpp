@@ -9,9 +9,10 @@
 // ════════════════════════════════════════════════════════════════
 
 float getBatteryVoltage() {
-  if (PIN_EN_VBAT != PIN_UNUSED) {
-    pinMode(PIN_EN_VBAT, OUTPUT);
-    digitalWrite(PIN_EN_VBAT, LOW);
+  if (g_pinVbat == PIN_UNUSED) return 0.0f;
+  if (g_pinEnVbat != PIN_UNUSED) {
+    pinMode(g_pinEnVbat, OUTPUT);
+    digitalWrite(g_pinEnVbat, LOW);
   }
 
   const float voltageDividerRatio = 2.0;
@@ -27,13 +28,13 @@ float getBatteryVoltage() {
 #endif
                            ESP_ADC_CAL_VAL_EFUSE_VREF, &adc_chars_local);
   for (int i = 0; i < BATTERY_SAMPLES; i++) {
-    uint32_t raw = analogRead(PIN_VBAT);
+    uint32_t raw = analogRead(g_pinVbat);
     sum_mV += esp_adc_cal_raw_to_voltage(raw, &adc_chars_local);
     delay(2);
   }
 #else
   for (int i = 0; i < BATTERY_SAMPLES; i++) {
-    sum_mV += analogReadMilliVolts(PIN_VBAT);
+    sum_mV += analogReadMilliVolts(g_pinVbat);
     delay(2);
   }
 #endif
@@ -50,6 +51,5 @@ int calculateBatteryPercentage(float voltage) {
 }
 
 bool isDeviceCharging() {
-  if (PIN_CHARGE == PIN_UNUSED) return false;
-  return digitalRead(PIN_CHARGE) == HIGH;
+  return false;
 }
