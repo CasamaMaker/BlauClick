@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-void readAllConfigs();
+void loadCmdConfig();
 uint8_t getCachedChannel();
 void setCachedChannel(uint8_t ch);
 

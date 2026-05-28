@@ -13,48 +13,62 @@ Ajuda l'usuari a generar un prompt complet i estructurat per executar en mode ag
 
 L'objectiu és que el prompt resultant sigui tan precís que l'agent pugui actuar de forma autònoma amb el mínim d'interrupcions.
 
-> L'agent ja té accés complet al projecte des de VSCode — no cal preguntar pel stack tècnic ni pels fitxers afectats, els infereix sol.
+> L'agent ja té accés complet al projecte des de VSCode — **no cal preguntar pel projecte ni pel stack tècnic**, els infereix del context.
+> La restricció és sempre la mateixa: **només modificar el que l'usuari indica, res més**.
 
 ---
 
 ## Flux de treball
 
-### Pas 1 — Preguntes clau
+### Pas 1 — Pregunta l'objectiu
 
-Presenta totes les preguntes **en un sol missatge**. No facis les preguntes de una en una.
+Fes **només** aquesta pregunta, i espera la resposta:
 
-#### Preguntes obligatòries
-
-| # | Camp | Descripció |
-|---|------|------------|
-| 1 | **Projecte** | Nom del projecte i descripció breu del seu propòsit |
-| 2 | **Objectiu** | Què ha de fer exactament l'agent? Descriu el resultat final desitjat |
-| 3 | **Punts concrets** | Llista de tasques o passos que l'agent ha de completar |
-| 4 | **Restriccions** | Què NO ha de fer? Patrons a evitar, coses a no trencar, dependències a no tocar |
-
-#### Preguntes opcionals (fes-les si aporta valor)
-
-- **Patrons a seguir**: Hi ha algun fitxer o mòdul de referència d'estil o estructura?
-- **Mode de revisió**: L'agent ha de demanar confirmació abans d'actes irreversibles?
+> "Quin és l'objectiu? Descriu el resultat final que vols aconseguir."
 
 ---
 
-### Pas 2 — Generar el prompt
+### Pas 2 — Pregunta els punts concrets
 
-Un cop obtingudes les respostes, genera el prompt seguint l'estructura de `references/prompt-template.md`.
+Un cop rebuda la resposta anterior, fes **només** aquesta pregunta, i espera la resposta:
+
+> "Quins són els punts concrets? Llista les tasques o passos que l'agent ha de completar."
+
+---
+
+### Pas 3 — Generar el prompt
+
+Un cop obtingudes les dues respostes, genera el prompt **directament des d'aquí**, sense llegir cap fitxer. Com a molt, pots llegir línies seleccionades de `references/prompt-template.md` si necessites un exemple concret, però no és necessari.
+
+**Estructura del prompt:**
+
+```markdown
+## Objectiu
+[Resultat final clar i concís. Una o dues frases.]
+
+## Tasques a realitzar
+1. [Pas concret i accionable]
+2. [...]
+
+## Restriccions
+- NO modificar res que no s'hagi especificat explícitament. Només tocar el que s'indica.
+
+## Criteris d'èxit
+- [ ] [Comportament verificable deduït de l'objectiu]
+- [ ] [Comportament verificable deduït dels punts concrets]
+- [ ] El build/compilació passa sense errors
+```
+
+**Regles fixes (no preguntar a l'usuari):**
+- **Projecte**: inferit del context de la conversa — no s'inclou al prompt
+- **Restriccions**: sempre la mateixa restricció hardcoded de dalt
+- **Criteris d'èxit**: deduïts automàticament — verificables (build passa, test passa, comportament observable...)
 
 **Principis de qualitat:**
+- **Descomposició en subtasques**: llista ordenada de passos accionables
+- **Sense ambigüitats**: evita paraules com "eficient" o "net" sense definir-les
 
-- **Descomposició en subtasques**: L'agent treballa millor amb una llista ordenada de passos
-- **Restriccions explícites**: El que NO ha de fer és tan important com el que ha de fer
-- **Criteris d'èxit auto-generats**: Dedueix-los de l'objectiu i els punts concrets — no els preguntis a l'usuari. Han de ser verificables (build passa, test passa, comportament observable...)
-- **Sense ambigüitats**: Evita paraules com "eficient" o "net" sense definir-les
-
----
-
-### Pas 3 — Aprovació del prompt
-
-Mostra el prompt generat i pregunta a l'usuari:
+Mostra el prompt generat i pregunta:
 
 > "T'agrada el prompt? Vols canviar o afegir alguna cosa abans d'executar-lo?"
 
@@ -64,13 +78,11 @@ Espera la resposta:
 
 ---
 
-### Pas 4 — Versió final per a Plan Mode
+### Pas 4 — Executar en Plan Mode
 
-Un cop aprovat, genera la versió final adaptada per a **Plan Mode** de VSCode Copilot.
+Un cop aprovat, genera i **executa directament** la versió final adaptada per a **Plan Mode**.
 
-Plan Mode analitza el codebase i crea un pla d'implementació detallat **abans** de fer cap canvi. L'usuari revisa i aprova el pla, i només llavors l'agent comença a codificar.
-
-Per activar-lo, afegeix aquest bloc al **principi** del prompt:
+Afegeix aquest bloc al **principi** del prompt:
 
 ```
 > MODE: PLAN
@@ -82,9 +94,3 @@ Per activar-lo, afegeix aquest bloc al **principi** del prompt:
 Mostra el prompt final complet (bloc Plan Mode + prompt aprovat) llest per copiar i enganxar.
 
 Afegeix una nota recordant a l'usuari que seleccioni **"Plan"** al desplegable de mode del panell de Copilot Chat a VSCode.
-
----
-
-## Consulta el template
-
-Llegeix `references/prompt-template.md` per veure l'estructura exacta del prompt i exemples complets.

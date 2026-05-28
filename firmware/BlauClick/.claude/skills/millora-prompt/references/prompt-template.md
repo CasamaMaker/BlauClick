@@ -1,18 +1,16 @@
 # Prompt Template per a VSCode Agent Mode
 
-Usa aquesta estructura per generar el prompt al Pas 2.
-Les seccions marcades com (opcional) s'inclouen només si l'usuari ho ha indicat.
+Usa aquesta estructura per generar el prompt al Pas 3.
+Les seccions marcades com (opcional) s'inclouen només si aporten valor clar.
 
 > No incloguis Stack tècnic ni Fitxers afectats — l'agent els infereix del projecte.
+> No incloguis secció "Projecte" — s'infereix del context de la conversa.
 
 ---
 
-## Template del prompt (Pas 2)
+## Template del prompt (Pas 3)
 
 ```markdown
-## Projecte
-[Nom del projecte]: [Descripció breu del seu propòsit]
-
 ## Objectiu
 [Descripció clara i concisa del resultat final. Una o dues frases màxim.]
 
@@ -26,17 +24,13 @@ Les seccions marcades com (opcional) s'inclouen només si l'usuari ho ha indicat
 - Mantén la convenció de noms [descripció]
 
 ## Restriccions
-- NO modificar [component o comportament crític]
-- NO afegir noves dependències sense confirmació
-- [Altres restriccions específiques]
+- NO modificar res que no s'hagi especificat explícitament. Només tocar el que s'indica.
+- [Restriccions addicionals deduïdes dels punts concrets, si n'hi ha]
 
 ## Criteris d'èxit
 - [ ] [Comportament verificable 1 — deduït de l'objectiu]
 - [ ] [Comportament verificable 2 — deduït dels punts concrets]
 - [ ] El build/compilació passa sense errors
-
-## Instruccions per a l'agent (opcional)
-- Demana confirmació abans de [acció irreversible concreta]
 ```
 
 ---
@@ -53,7 +47,7 @@ Quan l'usuari aprovi el prompt, presenta la versió final amb el bloc de Plan Mo
 
 ---
 
-## Projecte
+## Objectiu
 [... contingut del prompt aprovat ...]
 ```
 
@@ -78,11 +72,8 @@ Segueix la nota:
 
 ### Exemple 1 — Nova feature
 
-**Prompt generat (Pas 2):**
+**Prompt generat (Pas 3):**
 ```markdown
-## Projecte
-shop-api: API REST per a una botiga en línia amb gestió d'inventari.
-
 ## Objectiu
 Crear un endpoint POST /api/orders que permeti crear una comanda,
 descomptant l'estoc dels productes i enviant una notificació per email.
@@ -95,8 +86,8 @@ descomptant l'estoc dels productes i enviant una notificació per email.
 5. Afegir tests unitaris
 
 ## Restriccions
+- NO modificar res que no s'hagi especificat explícitament. Només tocar el que s'indica.
 - NO modificar el model `Product` existent
-- NO canviar l'autenticació JWT actual
 - El descompte d'estoc ha de ser transaccional
 
 ## Criteris d'èxit
@@ -115,9 +106,6 @@ descomptant l'estoc dels productes i enviant una notificació per email.
 
 ---
 
-## Projecte
-shop-api: API REST per a una botiga en línia amb gestió d'inventari.
-
 ## Objectiu
 Crear un endpoint POST /api/orders que permeti crear una comanda,
 descomptant l'estoc dels productes i enviant una notificació per email.
@@ -130,8 +118,8 @@ descomptant l'estoc dels productes i enviant una notificació per email.
 5. Afegir tests unitaris
 
 ## Restriccions
+- NO modificar res que no s'hagi especificat explícitament. Només tocar el que s'indica.
 - NO modificar el model `Product` existent
-- NO canviar l'autenticació JWT actual
 - El descompte d'estoc ha de ser transaccional
 
 ## Criteris d'èxit

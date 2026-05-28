@@ -12,6 +12,7 @@
 
 #ifndef HARDCODED_CONFIG
 
+// Esborra tota la configuració del namespace "blau" a la NVS.
 void clearConfig() {
   prefs.begin("blau", false);
   prefs.clear();
@@ -19,7 +20,10 @@ void clearConfig() {
   Serial.println("[NVS] Config esborrada");
 }
 
-void readAllConfigs() {
+// Llegeix MAC, SSID i paràmetres del cmd des de NVS cap a les variables globals.
+// Si la MAC no és vàlida, reseteja tot a valors per defecte.
+void loadCmdConfig() {
+
   memset(receiverMac, 0xFF, 6);
   prefs.begin("blau", true);
   size_t n = prefs.getBytes("mac", receiverMac, 6);
@@ -43,6 +47,7 @@ void readAllConfigs() {
   }
 }
 
+// Persisteix la MAC del receptor (receiverMac) a NVS.
 void saveMac() {
   prefs.begin("blau", false);
   prefs.putBytes("mac", receiverMac, 6);
@@ -50,6 +55,7 @@ void saveMac() {
   Serial.printf("[NVS] MAC guardada: %s\n", strMac.c_str());
 }
 
+// Persisteix l'SSID del receptor (receiverSSID) a NVS.
 void saveSSID() {
   prefs.begin("blau", false);
   prefs.putString("ssid", receiverSSID);
@@ -57,6 +63,8 @@ void saveSSID() {
   Serial.printf("[NVS] SSID guardat: %s\n", receiverSSID.c_str());
 }
 
+// Elimina MAC, canal i SSID tant de les variables globals com de NVS.
+// S'usa quan es vol desvincular el dispositiu del receptor.
 void deleteMac() {
   memset(receiverMac, 0xFF, 6);
   strMac = "FF:FF:FF:FF:FF:FF";
@@ -69,6 +77,7 @@ void deleteMac() {
   Serial.println("[NVS] MAC, canal i SSID esborrats");
 }
 
+// Actualitza i persisteix la comanda i paràmetres associats al click simple del botó 1.
 void saveCmd1Click(uint8_t cmd, uint8_t p1, uint8_t p2, uint8_t p3) {
   g_cmd1 = cmd; g_p1_1 = p1; g_p2_1 = p2; g_p3_1 = p3;
   prefs.begin("blau", false);
@@ -80,6 +89,7 @@ void saveCmd1Click(uint8_t cmd, uint8_t p1, uint8_t p2, uint8_t p3) {
   Serial.printf("[NVS] CMD1 guardat: cmd=%d p1=%d p2=%d p3=%d\n", cmd, p1, p2, p3);
 }
 
+// Retorna el canal Wi-Fi cached a NVS (1–13), o 0 si no n'hi ha cap de vàlid.
 uint8_t getCachedChannel() {
   prefs.begin("blau", true);
   uint8_t ch = prefs.getUChar("ch", 0);
@@ -87,6 +97,7 @@ uint8_t getCachedChannel() {
   return (ch >= 1 && ch <= 13) ? ch : 0;
 }
 
+// Guarda el canal a NVS només si ha canviat, per evitar escriptures innecessàries a la flash.
 void setCachedChannel(uint8_t ch) {
   if (ch >= 1 && ch <= 13) {
     prefs.begin("blau", true);
@@ -101,7 +112,10 @@ void setCachedChannel(uint8_t ch) {
   }
 }
 
+// Carrega la configuració de GPIO de hardware des de NVS i omple les variables g_pin*.
+// Si la clau "htmpl" no existeix, deixa els pins a PIN_UNUSED.
 void loadHwGpioConfig() {
+
   prefs.begin("blau", true);
   bool hasCfg = prefs.isKey("htmpl");
   if (hasCfg) {
@@ -137,6 +151,7 @@ void loadHwGpioConfig() {
                 g_pinLedDig, g_pinLed, g_pinBtn, g_pinBtnInv, g_pinEnBtn, g_pinVbat, g_pinEnVbat, g_hwTemplate, g_hwMcu);
 }
 
+// Persisteix el mapa de funcions GPIO (pins 0–46), la plantilla de hardware i el MCU a NVS.
 void saveHwGpioConfig(uint8_t* funcMap, int8_t tmpl, const char* mcu) {
   prefs.begin("blau", false);
   for (int i = 0; i <= 46; i++) {
@@ -149,6 +164,7 @@ void saveHwGpioConfig(uint8_t* funcMap, int8_t tmpl, const char* mcu) {
   Serial.println("[HW] Config hardware guardada");
 }
 
+// Esborra totes les claus de configuració de GPIO hardware de NVS.
 void clearHwGpioConfig() {
   prefs.begin("blau", false);
   for (int i = 0; i <= 46; i++) {
@@ -161,6 +177,7 @@ void clearHwGpioConfig() {
   Serial.println("[HW] Config hardware esborrada");
 }
 
+// Retorna true si la NVS té una config de hardware vàlida: cal "htmpl" i almenys un pin de botó.
 bool hwConfigIsValid() {
   prefs.begin("blau", true);
   if (!prefs.isKey("htmpl")) {
@@ -183,15 +200,18 @@ bool hwConfigIsValid() {
 
 #else
 
-// Mode HARDCODED: MAC i canal venen de config.h, NVS no s'usa
-void readAllConfigs() {
+// Mode HARDCODED: MAC i canal venen de config.h, NVS no s'usa.
+// Copia la MAC de HC_TARGET_MAC a les variables globals.
+void loadCmdConfig() {
   uint8_t hcMac[] = HC_TARGET_MAC;
   memcpy(receiverMac, hcMac, 6);
   strMac = macToString(receiverMac);
   Serial.printf("[HARDCODED] MAC: %s  canal: %d\n", strMac.c_str(), HC_CHANNEL);
 }
 
+// Retorna el canal fix definit a config.h (HC_CHANNEL).
 uint8_t getCachedChannel() { return HC_CHANNEL; }
+// No-op: en mode HARDCODED el canal no es pot canviar en temps d'execució.
 void setCachedChannel(uint8_t) {}
 
 void loadHwGpioConfig() {

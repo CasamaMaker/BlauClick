@@ -85,6 +85,51 @@ Preferences prefs;
 
 
 // ════════════════════════════════════════════════════════════════
+//  HELPERS
+// ════════════════════════════════════════════════════════════════
+
+static bool btnIsIdle() {
+  if (g_pinBtn    != PIN_UNUSED) return  digitalRead(g_pinBtn);
+  if (g_pinBtnInv != PIN_UNUSED) return !digitalRead(g_pinBtnInv);
+  return true;
+}
+
+static void enterAPMode() {
+  Serial.printf("[BTN] Hold -> mode AP. MAC guardada: %s\n", strMac.c_str());
+  wifiApModeServer();
+  bool buttonReleased = false;
+  while (1) {
+    dnsServer.processNextRequest();
+    uint16_t osc   = (millis() / 2) % 510;
+    uint8_t  bright = (osc < 255) ? osc : 510 - osc;
+    strip.setBrightness(bright);
+    strip.setPixelColor(0, COLOR_WIFI_AP);
+    strip.show();
+    if (startTime + WIFI_AP_TIMEOUT_MS < millis()) {
+      Serial.println("[AP] Temps excedit");
+      delay(200);
+      if (g_pinEnBtn != PIN_UNUSED) digitalWrite(g_pinEnBtn, LOW);
+      else esp_deep_sleep_start();
+    }
+    static bool lastHeld = true;
+    bool nowHeld = btnIsIdle();
+    if (!nowHeld && lastHeld && !buttonReleased) {
+      buttonReleased = true;
+      Serial.println("[BTN] Boto alliberat");
+      delay(200);
+    }
+    if (nowHeld && !lastHeld && buttonReleased) {
+      Serial.println("[BTN] Boto premut despres d'alliberar -> apagant");
+      delay(200);
+      if (g_pinEnBtn != PIN_UNUSED) digitalWrite(g_pinEnBtn, LOW);
+      else esp_deep_sleep_start();
+    }
+    lastHeld = nowHeld;
+  }
+}
+
+
+// ════════════════════════════════════════════════════════════════
 //  SETUP
 // ════════════════════════════════════════════════════════════════
 
@@ -114,7 +159,7 @@ void setup() {
     #endif
   #endif
 
-  readAllConfigs();
+  loadCmdConfig();
 
   batteryVoltage = getBatteryVoltage();
   batteryLevel   = calculateBatteryPercentage(batteryVoltage);
@@ -145,6 +190,16 @@ void setup() {
     }
   }
   #endif
+
+  // Espera per distingir click curt (ESP-NOW) de pulsació llarga (AP mode).
+  // Si el boto s'allibera -> click normal, continuem. Si arriba a 3s -> AP mode.
+  while (btnIsIdle()) {
+    if (millis() - startTime >= WIFI_AP_HOLD_MS) {
+      enterAPMode();
+      return;
+    }
+    delay(10);
+  }
 
   if (isMacValid(receiverMac)) {
     uint8_t ch = getCachedChannel();
@@ -179,67 +234,16 @@ void setup() {
 // ════════════════════════════════════════════════════════════════
 
 void loop() {
-  auto btnIsIdle = [&]() -> bool {
-    if (g_pinBtn    != PIN_UNUSED) return  digitalRead(g_pinBtn);    // HIGH = no premut (pull-up)
-    if (g_pinBtnInv != PIN_UNUSED) return !digitalRead(g_pinBtnInv); // LOW  = no premut (pull-down)
-    return true;
-  };
-
   if (btnIsIdle()) {
     strip.clear();
     strip.show();
     delay(100);
   } else {
-    if (g_pinEnBtn != PIN_UNUSED) {
-      digitalWrite(g_pinEnBtn, LOW);
-    } else {
-      esp_deep_sleep_start();
-    }
+    if (g_pinEnBtn != PIN_UNUSED) digitalWrite(g_pinEnBtn, LOW);
+    else esp_deep_sleep_start();
   }
 
   if (startTime + WIFI_AP_HOLD_MS < millis()) {
-    Serial.printf("[BTN] Hold -> mode AP. MAC guardada: %s\n", strMac.c_str());
-
-    wifiApModeServer();
-
-    bool buttonReleased = false;
-    while (1) {
-      dnsServer.processNextRequest();
-
-      uint16_t osc   = (millis() / 2) % 510;
-      uint8_t  bright = (osc < 255) ? osc : 510 - osc;
-      strip.setBrightness(bright);
-      strip.setPixelColor(0, COLOR_WIFI_AP);
-      strip.show();
-
-      if (startTime + WIFI_AP_TIMEOUT_MS < millis()) {
-        Serial.println("[AP] Temps excedit");
-        delay(200);
-        if (g_pinEnBtn != PIN_UNUSED) {
-          digitalWrite(g_pinEnBtn, LOW);
-        } else {
-          esp_deep_sleep_start();
-        }
-      }
-
-      static bool lastHeld = true;   // botó premut al entrar al mode AP
-      bool nowHeld = btnIsIdle();
-
-      if (!nowHeld && lastHeld && !buttonReleased) {
-        buttonReleased = true;
-        Serial.println("[BTN] Boto alliberat");
-        delay(200);
-      }
-      if (nowHeld && !lastHeld && buttonReleased) {
-        Serial.println("[BTN] Boto premut despres d'alliberar -> apagant");
-        delay(200);
-        if (g_pinEnBtn != PIN_UNUSED) {
-          digitalWrite(g_pinEnBtn, LOW);
-        } else {
-          esp_deep_sleep_start();
-        }
-      }
-      lastHeld = nowHeld;
-    }
+    enterAPMode();
   }
 }
