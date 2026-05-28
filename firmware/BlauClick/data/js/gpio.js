@@ -9,6 +9,18 @@
     var HW_GPIO_MIN = 0;
     var HW_GPIO_MAX = 21;
 
+    function hwUpdateFuncOptions() {
+      if (!hwFuncs.length) return;
+      document.querySelectorAll('select[id^="hwFunc_"]').forEach(function(sel) {
+        Array.from(sel.options).forEach(function(opt) {
+          var fid = parseInt(opt.value);
+          var entry = hwFuncs.find(function(f) { return f.id === fid; });
+          opt.textContent = (fid === 0) ? "" : t(entry ? entry.label : opt.value);
+        });
+      });
+    }
+    document.addEventListener('langchange', hwUpdateFuncOptions);
+
     function hwMakeBadge(text, bg, color) {
       var b = document.createElement("span");
       b.textContent = text;
@@ -101,7 +113,7 @@
         hwFuncs.forEach(function(f) {
           var opt = document.createElement("option");
           opt.value = f.id;
-          opt.textContent = (f.id === 0) ? "" : f.label;
+          opt.textContent = (f.id === 0) ? "" : t(f.label);
           if (f.id === func) opt.selected = true;
           sel.appendChild(opt);
         });
@@ -242,7 +254,7 @@
         hwFuncs.forEach(function(f) {
           var opt = document.createElement("option");
           opt.value = f.id;
-          opt.textContent = (f.id === 0) ? "" : f.label;
+          opt.textContent = (f.id === 0) ? "" : t(f.label);
           if (f.id === savedVal) opt.selected = true;
           sel.appendChild(opt);
         });

@@ -91,14 +91,14 @@ struct GpioFuncEntry {
 };
 
 inline const GpioFuncEntry FUNC_LIST[FUNC_COUNT] = {
-  { FUNC_NONE,    "Sense funci\xC3\xB3",   false },
-  { FUNC_EN_VBAT, "Habilita lectura bateria",       false },
-  { FUNC_VBAT,    "Lectura bateria",        true  },
-  { FUNC_BTN,     "Bot\xC3\xB3 (pull-down)", true  },
-  { FUNC_LED_DIG, "Led digital",            false },
-  { FUNC_EN_BTN,  "Habilita LDO/uC",           false },
-  { FUNC_BTN_INV, "Bot\xC3\xB3 (pull-up)",  true  },
-  { FUNC_LED,     "Led on/off",             false },
+  { FUNC_NONE,    "func_none",    false },
+  { FUNC_EN_VBAT, "func_en_vbat", false },
+  { FUNC_VBAT,    "func_vbat",    true  },
+  { FUNC_BTN,     "func_btn",     true  },
+  { FUNC_LED_DIG, "func_led_dig", false },
+  { FUNC_EN_BTN,  "func_en_btn",  false },
+  { FUNC_BTN_INV, "func_btn_inv", true  },
+  { FUNC_LED,     "func_led",     false },
 };
 
 struct GpioPinTemplate { uint8_t gpio; GpioFunc func; };

@@ -30,6 +30,14 @@ const i18n = {
     navConfiguracio: 'Configuració',
     navHardware:     'Hardware',
     navAltres:       'Altres',
+    func_none:       'Sense funció',
+    func_en_vbat:    'Habilita lectura bateria',
+    func_vbat:       'Lectura bateria',
+    func_btn:        'Botó (pull-down)',
+    func_led_dig:    'Led digital',
+    func_en_btn:     'Habilita LDO/uC',
+    func_btn_inv:    'Botó (pull-up)',
+    func_led:        'Led on/off',
   },
   en: {
     pageTitle:      'BlauClick Configurator',
@@ -62,6 +70,14 @@ const i18n = {
     navConfiguracio: 'Settings',
     navHardware:     'Hardware',
     navAltres:       'Others',
+    func_none:       'No function',
+    func_en_vbat:    'Enable battery reading',
+    func_vbat:       'Battery reading',
+    func_btn:        'Button (pull-down)',
+    func_led_dig:    'Digital LED',
+    func_en_btn:     'Enable LDO/µC',
+    func_btn_inv:    'Button (pull-up)',
+    func_led:        'LED on/off',
   },
   es: {
     pageTitle:      'Configurador BlauClick',
@@ -94,6 +110,14 @@ const i18n = {
     navConfiguracio: 'Configuración',
     navHardware:     'Hardware',
     navAltres:       'Otros',
+    func_none:       'Sin función',
+    func_en_vbat:    'Habilitar lectura batería',
+    func_vbat:       'Lectura batería',
+    func_btn:        'Botón (pull-down)',
+    func_led_dig:    'Led digital',
+    func_en_btn:     'Habilitar LDO/uC',
+    func_btn_inv:    'Botón (pull-up)',
+    func_led:        'Led on/off',
   },
 };
 
@@ -122,6 +146,7 @@ function setLanguage(lang) {
   currentLang = lang;
   try { localStorage.setItem('blau_lang', lang); } catch(e) {}
   applyTranslations(lang);
+  document.dispatchEvent(new Event('langchange'));
 }
 
 function detectLang() {
