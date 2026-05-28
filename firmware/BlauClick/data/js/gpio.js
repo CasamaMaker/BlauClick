@@ -34,16 +34,16 @@
       apiGetHwTemplates(function(data) {
         hwTemplates = data;
         var sel = document.getElementById("hwTemplateSelect");
-        while (sel.options.length > 1) sel.remove(1);
+        while (sel.options.length > 0) sel.remove(0);
+        var optCustom = document.createElement("option");
+        optCustom.value = HW_CUSTOM_TMPL;
+        optCustom.textContent = "Personalitzar";
+        sel.appendChild(optCustom);
         data.forEach(function(t, i) {
           var opt = document.createElement("option");
           opt.value = i; opt.textContent = t.name;
           sel.appendChild(opt);
         });
-        var optCustom = document.createElement("option");
-        optCustom.value = HW_CUSTOM_TMPL;
-        optCustom.textContent = "Personalitzar";
-        sel.appendChild(optCustom);
         done();
       });
       apiGetHwGpioCaps(function(data) {
@@ -68,16 +68,26 @@
         var cap = c3caps ? c3caps[i] : null;
         if (cap && !cap.valid) tr.style.opacity = "0.4";
 
+        var tdName = document.createElement("td");
+        tdName.style.cssText = "padding:2px 3px";
+        var nameInp = document.createElement("input");
+        nameInp.type = "text"; nameInp.maxLength = 12;
+        nameInp.style.cssText = "width:12ch;font-size:0.82em;border:1px solid #ddd;border-radius:4px;padding:2px 4px;box-sizing:border-box";
+        tdName.appendChild(nameInp);
+
         var tdGpio = document.createElement("td");
-        tdGpio.style.cssText = "padding:5px 8px;font-family:monospace;vertical-align:top";
-        tdGpio.appendChild(document.createTextNode("GPIO " + i));
+        tdGpio.style.cssText = "text-align:center;font-weight:600;color:#555;padding:4px 2px;white-space:nowrap";
+        tdGpio.appendChild(document.createTextNode(i));
+
+        var tdBadges = document.createElement("td");
+        tdBadges.style.cssText = "padding:2px 2px;vertical-align:middle";
         if (cap) {
-          var badges = document.createElement("div");
-          badges.style.cssText = "display:flex;gap:3px;margin-top:3px;flex-wrap:wrap";
-          if (cap.hasAdc)    badges.appendChild(hwMakeBadge("ADC", "#d4edda", "#155724"));
-          if (cap.hasPwm)    badges.appendChild(hwMakeBadge("PWM", "#cce5ff", "#004085"));
-          if (cap.inputOnly) badges.appendChild(hwMakeBadge("IN",  "#fff3cd", "#856404"));
-          tdGpio.appendChild(badges);
+          var badgeWrap = document.createElement("div");
+          badgeWrap.style.cssText = "display:flex;flex-direction:column;gap:2px";
+          if (cap.hasAdc)    badgeWrap.appendChild(hwMakeBadge("ADC", "#d4edda", "#155724"));
+          if (cap.hasPwm)    badgeWrap.appendChild(hwMakeBadge("PWM", "#cce5ff", "#004085"));
+          if (cap.inputOnly) badgeWrap.appendChild(hwMakeBadge("IN",  "#fff3cd", "#856404"));
+          tdBadges.appendChild(badgeWrap);
         }
 
         var tdFunc = document.createElement("td");
@@ -85,19 +95,21 @@
 
         var sel = document.createElement("select");
         sel.id = "hwFunc_" + i;
-        sel.style.width = "100%";
+        sel.style.cssText = "width:100%;font-size:0.82em";
         if (cap && !cap.valid) sel.disabled = true;
         sel.onchange = hwValidate;
         hwFuncs.forEach(function(f) {
           var opt = document.createElement("option");
           opt.value = f.id;
-          opt.textContent = f.label;
+          opt.textContent = (f.id === 0) ? "" : f.label;
           if (f.id === func) opt.selected = true;
           sel.appendChild(opt);
         });
 
         tdFunc.appendChild(sel);
+        tr.appendChild(tdName);
         tr.appendChild(tdGpio);
+        tr.appendChild(tdBadges);
         tr.appendChild(tdFunc);
         tbody.appendChild(tr);
       }
@@ -117,7 +129,9 @@
         }
       } else {
         hwIsCustomMode = false;
-        tmplSel.value = (tmpl !== undefined && tmpl >= 0) ? tmpl : -1;
+        tmplSel.value = (tmpl !== undefined && tmpl >= 0 && tmpl !== HW_CUSTOM_TMPL)
+          ? String(tmpl)
+          : String(HW_CUSTOM_TMPL);
         hwShowStdSection(true);
         hwShowCustomSection(false);
       }
@@ -186,42 +200,56 @@
       if (!profile) return;
       var table = document.createElement("table");
       table.style.cssText = "width:100%;border-collapse:collapse;margin:8px 0";
-      table.innerHTML = "<thead><tr style='border-bottom:1px solid #ddd'>" +
-        "<th style='text-align:left;padding:6px 8px;width:100px'>GPIO</th>" +
-        "<th style='text-align:left;padding:6px 8px'>Funci\xF3</th></tr></thead>";
+      table.innerHTML = "<thead><tr style='color:#888;font-size:0.8em'>" +
+        "<th style='text-align:left;padding:2px 3px;width:12ch'>Nom</th>" +
+        "<th style='text-align:center;padding:2px 4px;width:3em'>GPIO</th>" +
+        "<th style='padding:2px 2px;width:2.5em'></th>" +
+        "<th style='text-align:left;padding:2px 4px'>Funci\xF3</th></tr></thead>";
       var tbody = document.createElement("tbody");
       profile.caps.forEach(function(cap, i) {
         var tr = document.createElement("tr");
         tr.style.borderBottom = "1px solid #f0f0f0";
         if (!cap.valid) tr.style.opacity = "0.4";
 
+        var tdName = document.createElement("td");
+        tdName.style.cssText = "padding:2px 3px";
+        var nameInp = document.createElement("input");
+        nameInp.type = "text"; nameInp.maxLength = 12;
+        nameInp.style.cssText = "width:12ch;font-size:0.82em;border:1px solid #ddd;border-radius:4px;padding:2px 4px;box-sizing:border-box";
+        tdName.appendChild(nameInp);
+
         var tdGpio = document.createElement("td");
-        tdGpio.style.cssText = "padding:5px 8px;font-family:monospace;vertical-align:top";
-        tdGpio.appendChild(document.createTextNode("GPIO " + i));
-        var badges = document.createElement("div");
-        badges.style.cssText = "display:flex;gap:3px;margin-top:3px;flex-wrap:wrap";
-        if (cap.hasAdc)    badges.appendChild(hwMakeBadge("ADC", "#d4edda", "#155724"));
-        if (cap.hasPwm)    badges.appendChild(hwMakeBadge("PWM", "#cce5ff", "#004085"));
-        if (cap.inputOnly) badges.appendChild(hwMakeBadge("IN",  "#fff3cd", "#856404"));
-        tdGpio.appendChild(badges);
+        tdGpio.style.cssText = "text-align:center;font-weight:600;color:#555;padding:4px 2px;white-space:nowrap";
+        tdGpio.appendChild(document.createTextNode(i));
+
+        var tdBadges = document.createElement("td");
+        tdBadges.style.cssText = "padding:2px 2px;vertical-align:middle";
+        var badgeWrap = document.createElement("div");
+        badgeWrap.style.cssText = "display:flex;flex-direction:column;gap:2px";
+        if (cap.hasAdc)    badgeWrap.appendChild(hwMakeBadge("ADC", "#d4edda", "#155724"));
+        if (cap.hasPwm)    badgeWrap.appendChild(hwMakeBadge("PWM", "#cce5ff", "#004085"));
+        if (cap.inputOnly) badgeWrap.appendChild(hwMakeBadge("IN",  "#fff3cd", "#856404"));
+        tdBadges.appendChild(badgeWrap);
 
         var tdFunc = document.createElement("td");
         tdFunc.style.padding = "4px 8px";
         var sel = document.createElement("select");
         sel.id = "hwCustomFunc_" + i;
-        sel.style.width = "100%";
+        sel.style.cssText = "width:100%;font-size:0.82em";
         sel.disabled = !cap.valid;
         sel.onchange = hwValidate;
         var savedVal = data ? (data["f" + i] || 0) : 0;
         hwFuncs.forEach(function(f) {
           var opt = document.createElement("option");
           opt.value = f.id;
-          opt.textContent = f.label;
+          opt.textContent = (f.id === 0) ? "" : f.label;
           if (f.id === savedVal) opt.selected = true;
           sel.appendChild(opt);
         });
         tdFunc.appendChild(sel);
+        tr.appendChild(tdName);
         tr.appendChild(tdGpio);
+        tr.appendChild(tdBadges);
         tr.appendChild(tdFunc);
         tbody.appendChild(tr);
       });
@@ -294,7 +322,26 @@
       });
     }
 
+    var _hwClearPending = false, _hwClearTimer = null;
+
     function hwConfirmClear() {
-      if (!confirm("Esborrar la configuraci\xF3 de hardware? El dispositiu reiniciar\xE0.")) return;
-      apiClearHwConfig(function() {});
+      var btn = document.getElementById("hwClearBtn");
+      if (!_hwClearPending) {
+        _hwClearPending = true;
+        btn.textContent = "Confirmar esborrat";
+        btn.style.background = "#e74c3c";
+        btn.style.color = "#fff";
+        btn.style.borderColor = "#c0392b";
+        _hwClearTimer = setTimeout(function() {
+          _hwClearPending = false;
+          btn.textContent = "Esborrar configuraci\xF3";
+          btn.style.background = "";
+          btn.style.color = "";
+          btn.style.borderColor = "";
+        }, 5000);
+      } else {
+        clearTimeout(_hwClearTimer);
+        _hwClearPending = false;
+        apiClearHwConfig(function() {});
+      }
     }

@@ -183,11 +183,13 @@
 
     <!-- Pàgina: Config Hardware -->
     <div id="page-config-hardware" class="page">
-      <button class="back-btn" onclick="showPage('page-configuracio')" data-i18n="navBack">&#8592; Enrere</button>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <button class="back-btn" onclick="showPage('page-configuracio')" data-i18n="navBack">&#8592; Enrere</button>
+        <span style="font-weight:600;font-size:16px;color:var(--primary-color)" data-i18n="navHardware">Hardware</span>
+      </div>
       <div class="card">
-        <label data-i18n="navHardware">Hardware</label>
 
-        <div class="form-row" style="margin-top:12px">
+        <div class="form-row">
           <label style="display:block;margin-bottom:4px;font-weight:600">Plantilla de dispositiu</label>
           <select id="hwTemplateSelect" onchange="hwApplyTemplate(this.value)" style="width:100%">
             <option value="-1">-- Sense plantilla --</option>
@@ -206,11 +208,13 @@
           <div id="hwCustomGpioContainer"></div>
         </div>
 
-        <table id="hwStdTable" style="width:100%;border-collapse:collapse;margin:16px 0 8px">
+        <table id="hwStdTable" style="width:100%;border-collapse:collapse;margin:16px 0 8px;font-size:0.88em">
           <thead>
-            <tr style="border-bottom:1px solid #ddd">
-              <th style="text-align:left;padding:6px 8px;width:60px">GPIO</th>
-              <th style="text-align:left;padding:6px 8px">Funci&#xF3;</th>
+            <tr style="color:#888;font-size:0.8em">
+              <th style="text-align:left;padding:2px 3px;width:12ch">Nom</th>
+              <th style="text-align:center;padding:2px 4px;width:3em">GPIO</th>
+              <th style="padding:2px 2px;width:2.5em"></th>
+              <th style="text-align:left;padding:2px 4px">Funci&#xF3;</th>
             </tr>
           </thead>
           <tbody id="hwGpioTableBody"></tbody>
@@ -218,9 +222,9 @@
 
         <div id="hwValidationMsg" style="color:#e74c3c;font-size:0.88em;margin:8px 0;display:none"></div>
 
-        <div style="display:flex;gap:8px;margin-top:14px">
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">
           <button class="btn" id="hwSaveBtn" onclick="hwSave()">Guardar configuraci&#xF3;</button>
-          <button class="btn" style="background:#c0392b" onclick="hwConfirmClear()">Esborrar configuraci&#xF3;</button>
+          <button class="btn btn-secondary" id="hwClearBtn" onclick="hwConfirmClear()">Esborrar configuraci&#xF3;</button>
         </div>
       </div>
     </div>

@@ -151,7 +151,7 @@ static const GpioCaps ESP32C3_GPIO_CAPS[22] = {
 };
 
 static const GpioCaps ESP32S3_GPIO_CAPS[47] = {
-  //        valid,  hasPwm,  hasAdc, inputOnly
+  // valid, hasPwm, hasAdc, inputOnly
   {  true,  true,  false,   false },  //  0 (strapping)
   {  true,  true,   true,   false },  //  1
   {  true,  true,   true,   false },  //  2
