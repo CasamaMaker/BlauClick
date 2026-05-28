@@ -69,9 +69,7 @@ void webServerSetup() {
 
   server.on("/deletemac", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(200, "text/plain", "macDeleted");
-    #ifndef HARDCODED_CONFIG
-      deleteMac();
-    #endif
+    deleteMac();
     Serial.println("[WEB] MAC esborrada");
   });
 
@@ -97,13 +95,8 @@ void webServerSetup() {
     Serial.printf("[WEB] battery: %d%% charging=%s\n", batteryLevel, isCharging ? "true" : "false");
   });
 
-  // Retorna "hardcoded" o "web" per al HTML
   server.on("/configMode", HTTP_GET, [](AsyncWebServerRequest *request) {
-    #ifdef HARDCODED_CONFIG
-      request->send(200, "text/plain", "hardcoded");
-    #else
-      request->send(200, "text/plain", "web");
-    #endif
+    request->send(200, "text/plain", "web");
   });
 
   // Retorna versió firmware i MAC pròpia
@@ -123,13 +116,11 @@ void webServerSetup() {
   });
 
   server.on("/save_1click_cmd", HTTP_POST, [](AsyncWebServerRequest *request) {
-    #ifndef HARDCODED_CONFIG
-      uint8_t cmd = request->hasParam("cmd", true) ? (uint8_t)request->getParam("cmd", true)->value().toInt() : 0x01u;
-      uint8_t p1  = request->hasParam("p1",  true) ? (uint8_t)request->getParam("p1",  true)->value().toInt() : 0;
-      uint8_t p2  = request->hasParam("p2",  true) ? (uint8_t)request->getParam("p2",  true)->value().toInt() : 0;
-      uint8_t p3  = request->hasParam("p3",  true) ? (uint8_t)request->getParam("p3",  true)->value().toInt() : 0;
-      saveCmd1Click(cmd, p1, p2, p3);
-    #endif
+    uint8_t cmd = request->hasParam("cmd", true) ? (uint8_t)request->getParam("cmd", true)->value().toInt() : 0x01u;
+    uint8_t p1  = request->hasParam("p1",  true) ? (uint8_t)request->getParam("p1",  true)->value().toInt() : 0;
+    uint8_t p2  = request->hasParam("p2",  true) ? (uint8_t)request->getParam("p2",  true)->value().toInt() : 0;
+    uint8_t p3  = request->hasParam("p3",  true) ? (uint8_t)request->getParam("p3",  true)->value().toInt() : 0;
+    saveCmd1Click(cmd, p1, p2, p3);
     request->send(200, "text/plain", "ok");
   });
 
@@ -144,31 +135,29 @@ void webServerSetup() {
   });
 
   server.on("/", HTTP_POST, [](AsyncWebServerRequest *request) {
-    #ifndef HARDCODED_CONFIG
-      int params = request->params();
-      for (int i = 0; i < params; i++) {
-        const AsyncWebParameter* p = request->getParam(i);
-        if (p->isPost() && p->name() == PARAM_INPUT_1) {
-          strMac = p->value().c_str();
-          Serial.printf("[WEB] Nova MAC: %s\n", strMac.c_str());
-          strMac.replace(":", "");
-          if (strMac.length() > 0) {
-            for (int j = 0; j < 6; j++) {
-              receiverMac[j] = strtol(strMac.substring(j * 2, j * 2 + 2).c_str(), NULL, 16);
-            }
-            strMac = macToString(receiverMac);
-            saveMac();
+    int params = request->params();
+    for (int i = 0; i < params; i++) {
+      const AsyncWebParameter* p = request->getParam(i);
+      if (p->isPost() && p->name() == PARAM_INPUT_1) {
+        strMac = p->value().c_str();
+        Serial.printf("[WEB] Nova MAC: %s\n", strMac.c_str());
+        strMac.replace(":", "");
+        if (strMac.length() > 0) {
+          for (int j = 0; j < 6; j++) {
+            receiverMac[j] = strtol(strMac.substring(j * 2, j * 2 + 2).c_str(), NULL, 16);
           }
-        }
-        if (p->isPost() && p->name() == "ssid") {
-          receiverSSID = p->value();
-          saveSSID();
-          prefs.begin("blau", false);
-          prefs.remove("ch");
-          prefs.end();
+          strMac = macToString(receiverMac);
+          saveMac();
         }
       }
-    #endif
+      if (p->isPost() && p->name() == "ssid") {
+        receiverSSID = p->value();
+        saveSSID();
+        prefs.begin("blau", false);
+        prefs.remove("ch");
+        prefs.end();
+      }
+    }
     request->send(200, "text/plain", "Configurat! Ja pots provar");
     delay(1000);
     if (g_pinEnBtn != PIN_UNUSED) {
@@ -201,16 +190,12 @@ void webServerSetup() {
 
   server.on("/clearconfig", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(200, "text/plain", "Config esborrada. Reiniciant...");
-    #ifndef HARDCODED_CONFIG
-      clearConfig();
-    #endif
+    clearConfig();
     delay(500);
     ESP.restart();
   });
 
   // ── Config hardware dinàmica ──────────────────────────────────
-  #ifndef HARDCODED_CONFIG
-
   server.on("/hw_gpiomap", HTTP_GET, [](AsyncWebServerRequest *request) {
     uint8_t funcMap[47] = {};
     if (g_pinEnVbat >= 0 && g_pinEnVbat <= 46) funcMap[g_pinEnVbat] = FUNC_EN_VBAT;
@@ -301,8 +286,6 @@ void webServerSetup() {
     delay(200);
     ESP.restart();
   });
-
-  #endif
 
   server.onNotFound(serveixWifiManager);
   server.begin();

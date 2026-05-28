@@ -41,9 +41,7 @@ extern int   batteryLevel;
 extern bool  isCharging;
 
 // ── Preferences (NVS) ───────────────────────────────────────────
-#ifndef HARDCODED_CONFIG
 extern Preferences prefs;
-#endif
 
 // ── Pins dinàmics de hardware ────────────────────────────────────
 extern int g_pinEnVbat;

@@ -10,8 +10,6 @@
 //  GESTIÓ DE CONFIGURACIÓ (NVS / Preferences)
 // ════════════════════════════════════════════════════════════════
 
-#ifndef HARDCODED_CONFIG
-
 // Esborra tota la configuració del namespace "blau" a la NVS.
 void clearConfig() {
   prefs.begin("blau", false);
@@ -197,27 +195,3 @@ bool hwConfigIsValid() {
   prefs.end();
   return hasBtn;
 }
-
-#else
-
-// Mode HARDCODED: MAC i canal venen de config.h, NVS no s'usa.
-// Copia la MAC de HC_TARGET_MAC a les variables globals.
-void loadCmdConfig() {
-  uint8_t hcMac[] = HC_TARGET_MAC;
-  memcpy(receiverMac, hcMac, 6);
-  strMac = macToString(receiverMac);
-  Serial.printf("[HARDCODED] MAC: %s  canal: %d\n", strMac.c_str(), HC_CHANNEL);
-}
-
-// Retorna el canal fix definit a config.h (HC_CHANNEL).
-uint8_t getCachedChannel() { return HC_CHANNEL; }
-// No-op: en mode HARDCODED el canal no es pot canviar en temps d'execució.
-void setCachedChannel(uint8_t) {}
-
-void loadHwGpioConfig() {
-  // En mode HARDCODED els g_pin* queden a PIN_UNUSED (sense configuració de hardware)
-  Serial.printf("[HW] HARDCODED: LED_DIG=%d LED=%d BTN=%d BTN_INV=%d EN_BTN=%d VBAT=%d EN_VBAT=%d\n",
-                g_pinLedDig, g_pinLed, g_pinBtn, g_pinBtnInv, g_pinEnBtn, g_pinVbat, g_pinEnVbat);
-}
-
-#endif

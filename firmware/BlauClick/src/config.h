@@ -6,19 +6,6 @@
 #define PIN_UNUSED  -1   // pin no connectat / no utilitzat
 
 
-// ════════════════════════════════════════════════════════════════
-//  MODE DE CONFIGURACIÓ
-//  · Comentat    → configuració via web (MAC i canal guardats a NVS)
-//  · Descomentat → MAC i canal fixats al codi; la web UI és de
-//                  només lectura i no modifica la configuració
-// ════════════════════════════════════════════════════════════════
-// #define HARDCODED_CONFIG   // comenta per desactivar
-
-#ifdef HARDCODED_CONFIG
-  #define HC_TARGET_MAC  { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF }  // MAC del BlauTrigger
-  #define HC_CHANNEL     1                                         // Canal Wi-Fi
-#endif
-
 
 // ════════════════════════════════════════════════════════════════
 //  ESBORRA CONFIG  (descomenta per esborrar les Preferences de NVS)

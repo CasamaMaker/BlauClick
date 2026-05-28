@@ -79,9 +79,7 @@ bool  isCharging;
 unsigned long startTime;
 
 // ── Preferences (NVS) ───────────────────────────────────────────
-#ifndef HARDCODED_CONFIG
 Preferences prefs;
-#endif
 
 
 // ════════════════════════════════════════════════════════════════
@@ -151,12 +149,10 @@ void setup() {
     return;
   }
 
-  #ifndef HARDCODED_CONFIG
-    #ifdef CLEAR_CONFIG
-      clearConfig();
-      Serial.println("[BOOT] CLEAR_CONFIG: NVS esborrada, reiniciant...");
-      ESP.restart();
-    #endif
+  #ifdef CLEAR_CONFIG
+    clearConfig();
+    Serial.println("[BOOT] CLEAR_CONFIG: NVS esborrada, reiniciant...");
+    ESP.restart();
   #endif
 
   loadCmdConfig();
@@ -176,7 +172,6 @@ void setup() {
   }
   if (g_pinLed != PIN_UNUSED) { pinMode(g_pinLed, OUTPUT); digitalWrite(g_pinLed, LOW); }
 
-  #ifndef HARDCODED_CONFIG
   if (!hwConfigIsValid()) {
     Serial.println("[BOOT] Sense config hardware -> mode AP de configuració");
     wifiApModeServer();
@@ -189,7 +184,6 @@ void setup() {
       strip.show();
     }
   }
-  #endif
 
   // Espera per distingir click curt (ESP-NOW) de pulsació llarga (AP mode).
   // Si el boto s'allibera -> click normal, continuem. Si arriba a 3s -> AP mode.
