@@ -13,8 +13,8 @@
 [![License](https://img.shields.io/github/license/CasamaMaker/BlauClick.svg)](LICENSE.txt)
 
 [English](README.md) |
-[Català](/documents/README.cat.md) |
-[Español](/documents/README.es.md)
+[Català](README.cat.md) |
+[Español](README.es.md)
 
 ---
 
