@@ -1,4 +1,0 @@
-llum sostre: 10:52:1C:88:5D:BD
-tinyESP maekoe: A0:76:4E:36:0A:89
-ESPlink1: 64:e8:33:c7:62:50
-BLE_Rele1: 10:52:1C:88:5D:91

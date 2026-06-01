@@ -12,6 +12,10 @@
 [![Protocol](https://img.shields.io/badge/Protocol-ESP--NOW-informational)](https://www.espressif.com/en/solutions/low-power-solutions/esp-now)
 [![License](https://img.shields.io/github/license/CasamaMaker/BlauClick.svg)](LICENSE.txt)
 
+[English](README.md) |
+[Català](/documents/README.cat.md) |
+[Español](/documents/README.es.md)
+
 ---
 
 *The **sender** side of the Blau ecosystem — sends button events wirelessly to a [BlauLux](https://github.com/CasamaMaker/BlauLux) receiver.*
@@ -20,7 +24,7 @@
 
 ---
 
-[🌐 Ecosystem](#-blaulink-ecosystem) · [✨ Features](#-features) · [🔌 Hardware](#-hardware) · [🚀 Getting Started](#-getting-started) · [⚙️ Configuration](#️-configuration) · [📖 Usage](#-usage) · [📡 Protocol](#-blauprotocol) · [📁 Structure](#-project-structure) · [🔧 Troubleshooting](#-troubleshooting) · [🔗 Related](#-related-projects)
+[🌐 Ecosystem](#-blau-ecosystem) · [✨ Features](#-features) · [🔌 Hardware](#-hardware) · [🚀 Getting Started](#-getting-started) · [⚙️ Configuration](#️-configuration) · [📖 Usage](#-usage) · [📡 Protocol](#-blauprotocol) · [📁 Structure](#-project-structure) · [🔧 Troubleshooting](#-troubleshooting) · [🔗 Related](#-related-projects)
 
 ---
 
@@ -152,7 +156,7 @@ On first boot (or after clearing config), the device has no target MAC configure
 2. From your phone or computer, connect to the network **`BlauClick_XXXX`** (last 4 chars of the MAC).
 3. The captive portal opens automatically — or navigate to `http://192.168.4.1`.
 4. Select a hardware template (or assign GPIO functions manually).
-5. Scan for nearby devices and select the target BlauLux/BlauLux MAC address.
+5. Scan for nearby devices and select the target BlauLux MAC address.
 6. Configure the command to send on click.
 7. Press **Save**. The device restarts and enters normal operation.
 
@@ -189,7 +193,7 @@ All hardware and behaviour parameters can be changed from the web interface (`ht
 
 - **Hardware template** — select a predefined GPIO configuration
 - **GPIO assignment** — assign a function to each pin
-- **Target MAC** — ESP-NOW address of the BlauLux/BlauLux receiver
+- **Target MAC** — ESP-NOW address of the BlauLux receiver
 - **1-click command** — command and parameters to send on single press
 - **WiFi STA** — connect to home network (for OTA or future MQTT)
 
