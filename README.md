@@ -4,8 +4,8 @@
 
 **Battery-powered ESP32-C3 smart button for fast, wireless load control**
 
-[![GitHub release](https://img.shields.io/github/release/CasamaMaker/BlauClick.svg)](https://github.com/CasamaMaker/BlauClick/releases)
-[![GitHub downloads](https://img.shields.io/github/downloads/CasamaMaker/BlauClick/total.svg)](https://github.com/CasamaMaker/BlauClick/releases/latest)
+[![GitHub release](https://img.shields.io/github/release/CasamaMaker/BlauClick.svg?nocache=1)](https://github.com/CasamaMaker/BlauClick/releases)
+[![GitHub downloads](https://img.shields.io/github/downloads/CasamaMaker/BlauClick/total.svg?nocache=1)](https://github.com/CasamaMaker/BlauClick/releases/latest)
 [![PlatformIO](https://img.shields.io/badge/PlatformIO-ESP32-orange?logo=platformio)](https://platformio.org/)
 [![Framework](https://img.shields.io/badge/Framework-Arduino-00979D?logo=arduino)](https://www.arduino.cc/)
 [![ESP32-C3](https://img.shields.io/badge/ESP32--C3-RISC--V-blue)](https://www.espressif.com/en/products/socs/esp32-c3)
