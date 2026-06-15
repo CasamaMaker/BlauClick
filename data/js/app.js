@@ -212,6 +212,125 @@
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
       document.getElementById(id).classList.add('active');
       if (id === 'page-config-hardware') hwInit();
+      if (id === 'page-config-seguretat') fetchSecurityStatus();
+      if (id === 'page-config-altres') fetchDeviceName();
+    }
+
+    // ── ESP-NOW / BlauProtocol v2 estat ────────────────────────────
+
+    function fetchEspNowStatus() {
+      apiGetSecurityStatus(function(data) {
+        var badge = document.getElementById('espnowStatusBadge');
+        if (badge) {
+          badge.textContent = data.configured ? t('espnowActive') : t('espnowLegacy');
+          badge.style.color = data.configured ? '#27ae60' : '#888';
+        }
+      });
+      var xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+          var mac = this.responseText.trim();
+          var el = document.getElementById('espnowPeer');
+          if (el) el.textContent = (mac && mac !== 'FF:FF:FF:FF:FF:FF') ? mac : t('espnowNoPeer');
+        }
+      };
+      xhttp.open("GET", "/mac", true);
+      xhttp.send();
+    }
+
+    // ── Seguretat BlauProtocol v2 ──────────────────────────────────
+
+    function fetchSecurityStatus() {
+      apiGetSecurityStatus(function(data) {
+        var badge = document.getElementById('secStatusBadge');
+        if (badge) {
+          badge.textContent = data.configured ? t('secConfigured') : t('secNotConfigured');
+          badge.style.color = data.configured ? '#27ae60' : '#888';
+        }
+      });
+    }
+
+    // ── Nom del dispositiu ─────────────────────────────────────────
+
+    function fetchDeviceName() {
+      apiGetDeviceName(function(name) {
+        var el = document.getElementById('deviceNameInput');
+        if (el) el.value = name.trim();
+      });
+    }
+
+    function _altresMsg(text, isError) {
+      var el = document.getElementById('altresMsg');
+      if (el) { el.textContent = text; el.style.color = isError ? '#e74c3c' : '#27ae60'; }
+    }
+
+    function saveDeviceName() {
+      var name = document.getElementById('deviceNameInput').value.trim();
+      if (!name) return;
+      apiSaveDeviceName(name, function(ok) {
+        _altresMsg(ok ? t('altresSaved') : t('altresError'), !ok);
+      });
+    }
+
+    var _clearAltresPending = false, _clearAltresTimer = null;
+    function confirmClearAltres() {
+      var btn = document.getElementById('clearAltresBtn');
+      if (!_clearAltresPending) {
+        _clearAltresPending = true;
+        btn.textContent = t('secClearConfirm');
+        _clearAltresTimer = setTimeout(function() {
+          _clearAltresPending = false;
+          btn.textContent = t('clearAltresBtn');
+        }, 5000);
+      } else {
+        clearTimeout(_clearAltresTimer); _clearAltresPending = false;
+        btn.textContent = t('clearAltresBtn');
+        apiClearDeviceName(function(name) {
+          var el = document.getElementById('deviceNameInput');
+          if (el) el.value = name.trim();
+          _altresMsg(t('clearAltresDone'), false);
+        });
+      }
+    }
+
+    function _secMsg(text, isError) {
+      var el = document.getElementById('secMsg');
+      el.textContent = text;
+      el.style.color = isError ? '#e74c3c' : '#27ae60';
+    }
+
+    function saveSecurityPass() {
+      var pass = document.getElementById('secPassInput').value.trim();
+      if (pass.length < 8 || pass.length > 63) { _secMsg(t('secLenError'), true); return; }
+      apiSaveSecurity(pass, function(ok) {
+        if (ok) {
+          document.getElementById('secPassInput').value = '';
+          _secMsg(t('secSaved'), false);
+          fetchSecurityStatus();
+        } else {
+          _secMsg(t('secError'), true);
+        }
+      });
+    }
+
+    var _clearSecPending = false, _clearSecTimer = null;
+    function confirmClearSecurity() {
+      var btn = document.getElementById('clearSecBtn');
+      if (!_clearSecPending) {
+        _clearSecPending = true;
+        btn.textContent = t('secClearConfirm');
+        _clearSecTimer = setTimeout(function() {
+          _clearSecPending = false;
+          btn.textContent = t('secClearBtn');
+        }, 5000);
+      } else {
+        clearTimeout(_clearSecTimer); _clearSecPending = false;
+        btn.textContent = t('secClearBtn');
+        apiClearSecurity(function(ok) {
+          _secMsg(ok ? t('secCleared') : t('secError'), !ok);
+          fetchSecurityStatus();
+        });
+      }
     }
 
     window.onload = function() {
@@ -221,6 +340,7 @@
 
       fetchMyMac();
       fetchMac();
+      fetchEspNowStatus();
       // simulateBattery();  // Para demo, usar batería simulada
       fetchBatteryLevel();  //per llegir info real de bateria
       apiGetInfo(function(info) {

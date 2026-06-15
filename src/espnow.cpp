@@ -6,7 +6,10 @@
 #include "globals.h"
 #include "blauprotocol.h"
 #include "blauprotocol_link.h"
+#include "blauprotocol_crypto.h"
+#include "blauprotocol_link2.h"
 #include "espnow.h"
+#include "nvs_config.h"
 
 // ── Seqüències ESP-NOW (estat intern del mòdul) ──────────────────
 static uint8_t       blau_seq          = 0;
@@ -26,6 +29,16 @@ void OnDataSent(const wifi_tx_info_t *tx_info, esp_now_send_status_t status) {
 }
 
 void OnDataRecv(const esp_now_recv_info_t *recv_info, const uint8_t *data, int len) {
+  // Dispatch v2 / v1
+  if (len == (int)BLAU_V2_PACKET_SIZE && data[0] == BLAU_PROTO_VERSION_V2) {
+    blau2_on_data_recv(recv_info->src_addr, data, len, &blau_ack_received, &blau_ack_seq, &blau_ack_result);
+    return;
+  }
+  // Anti-downgrade: amb clau v2 configurada no s'accepten respostes v1 en clar
+  if (blau_crypto_has_key()) {
+    Serial.println("[SEC] Resposta v1 rebutjada: clau v2 configurada");
+    return;
+  }
   blau_on_data_recv(recv_info->src_addr, data, len, &blau_ack_received, &blau_ack_seq, &blau_ack_result);
 }
 
@@ -91,6 +104,17 @@ void send_ping() {
   blau_seq = millis() & 0xFF;
   blau_build_ping_packet(&pkt, blau_seq);
   blau_ack_received = false;
+
+  if (blau_crypto_has_key()) {
+    BlauPacketV2_t pkt_v2;
+    if (!blau_v2_encrypt(&pkt, getNextNonce(), &pkt_v2)) {
+      Serial.println("[SEC] Error xifrant PING");
+      return;
+    }
+    esp_err_t r = esp_now_send(receiverMac, (uint8_t*)&pkt_v2, sizeof(pkt_v2));
+    Serial.printf("[ESPNOW] PING v2 enviat seq=%d err=0x%X\n", pkt.seq, r);
+    return;
+  }
   esp_err_t r = esp_now_send(receiverMac, (uint8_t*)&pkt, sizeof(pkt));
   Serial.printf("[ESPNOW] PING enviat seq=%d err=0x%X\n", pkt.seq, r);
 }
@@ -102,7 +126,14 @@ bool send_ESPNOW() {
   blau_build_cmd_packet(&pkt, blau_seq, g_cmd1, g_p1_1, g_p2_1, g_p3_1);
   // blau_build_cmd_packet(&pkt, blau_seq, CMD_SET_RGB, 255,0,0);
 
-  bool ok = blau_send_with_ack(&pkt, receiverMac, &blau_ack_received, &blau_ack_seq, &blau_ack_result);
+  bool ok;
+  if (blau_crypto_has_key()) {
+    ok = blau2_send_with_ack(&pkt, getNextNonce(), receiverMac,
+                             &blau_ack_received, &blau_ack_seq, &blau_ack_result);
+  } else {
+    Serial.println("[SEC] Sense clau v2 — enviant v1 legacy");
+    ok = blau_send_with_ack(&pkt, receiverMac, &blau_ack_received, &blau_ack_seq, &blau_ack_result);
+  }
   blau_seq = millis() & 0xFF;
 
   strip.setPixelColor(0, ok ? COLOR_ESPNOW_OK : COLOR_ESPNOW_FAIL);

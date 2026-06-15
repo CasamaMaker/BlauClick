@@ -124,6 +124,60 @@ void webServerSetup() {
     request->send(200, "text/plain", "ok");
   });
 
+  // ── Seguretat BlauProtocol v2 ─────────────────────────────────
+
+  server.on("/securityStatus", HTTP_GET, [](AsyncWebServerRequest *request) {
+    String json = "{\"configured\":" + String(securityConfigured() ? "true" : "false") + "}";
+    request->send(200, "application/json", json);
+  });
+
+  server.on("/security", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!request->hasParam("protopass", true)) { request->send(400, "text/plain", "missing protopass"); return; }
+    String pass = request->getParam("protopass", true)->value();
+    pass.trim();
+    if (pass.length() < 8 || pass.length() > 63) {
+      request->send(400, "text/plain", "password length 8-63");
+      return;
+    }
+    bool ok = saveSecurityPassword(pass.c_str());   // PBKDF2 ~100 ms
+    request->send(ok ? 200 : 500, "text/plain", ok ? "OK" : "ERROR");
+  });
+
+  server.on("/clearsecurity", HTTP_POST, [](AsyncWebServerRequest *request) {
+    clearSecurity();
+    request->send(200, "text/plain", "OK");
+  });
+
+  // ── Nom del dispositiu ────────────────────────────────────────
+
+  server.on("/devicename", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "text/plain", g_device_name);
+  });
+
+  server.on("/devicename", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (request->hasParam("device_name", true)) {
+      String name = request->getParam("device_name", true)->value();
+      name.trim();
+      if (name.length() > 0 && name.length() <= 32) {
+        g_device_name = name;
+        prefs.begin("blau", false);
+        prefs.putString("devname", g_device_name);
+        prefs.end();
+        Serial.printf("[CFG] device_name: %s\n", g_device_name.c_str());
+      }
+    }
+    request->send(200, "text/plain", "OK");
+  });
+
+  server.on("/cleardevicename", HTTP_POST, [](AsyncWebServerRequest *request) {
+    g_device_name = WIFI_SSID;
+    prefs.begin("blau", false);
+    prefs.remove("devname");
+    prefs.end();
+    Serial.printf("[CFG] Nom del dispositiu esborrat (default: %s)\n", g_device_name.c_str());
+    request->send(200, "text/plain", g_device_name.c_str());
+  });
+
   server.on("/disconnect-ap", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(200, "text/plain", "Disconnecting WiFi AP...");
     delay(1000);

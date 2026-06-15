@@ -4,6 +4,7 @@
 #include "globals.h"
 #include "utils.h"
 #include "nvs_config.h"
+#include <blauprotocol_crypto.h>
 
 
 // ════════════════════════════════════════════════════════════════
@@ -15,6 +16,7 @@ void clearConfig() {
   prefs.begin("blau", false);
   prefs.clear();
   prefs.end();
+  g_device_name = WIFI_SSID;
   Serial.println("[NVS] Config esborrada");
 }
 
@@ -30,6 +32,7 @@ void loadCmdConfig() {
   g_p1_1 = prefs.getUChar("p1_1", 0);
   g_p2_1 = prefs.getUChar("p2_1", 0);
   g_p3_1 = prefs.getUChar("p3_1", 0);
+  g_device_name = prefs.getString("devname", WIFI_SSID);
   prefs.end();
 
   if (n == 6 && isMacValid(receiverMac)) {
@@ -85,6 +88,69 @@ void saveCmd1Click(uint8_t cmd, uint8_t p1, uint8_t p2, uint8_t p3) {
   prefs.putUChar("p3_1", p3);
   prefs.end();
   Serial.printf("[NVS] CMD1 guardat: cmd=%d p1=%d p2=%d p3=%d\n", cmd, p1, p2, p3);
+}
+
+// ════════════════════════════════════════════════════════════════
+//  BlauProtocol v2 — seguretat (NVS namespace "blau_tx")
+// ════════════════════════════════════════════════════════════════
+
+// Carrega la clau AES de NVS al context crypto. Cridar al setup.
+bool loadSecurityConfig() {
+  bool ok = false;
+  if (prefs.begin("blau_tx", true)) {
+    uint8_t key[BLAU_AES_KEY_LEN];
+    if (prefs.getBytesLength("aes_key") == BLAU_AES_KEY_LEN) {
+      prefs.getBytes("aes_key", key, BLAU_AES_KEY_LEN);
+      ok = blau_crypto_set_key(key);
+    }
+    prefs.end();
+  }
+  Serial.printf("[SEC] Clau v2: %s\n", ok ? "configurada (mode segur)" : "no configurada (mode v1 legacy)");
+  return ok;
+}
+
+// Deriva la clau amb PBKDF2 i la persisteix. La contrasenya no es guarda.
+// Inicialitza el nonce amb un valor aleatori si encara no existeix (mesura 4).
+bool saveSecurityPassword(const char* pwd) {
+  uint8_t key[BLAU_AES_KEY_LEN];
+  if (!blau_derive_key(pwd, key)) {
+    Serial.println("[SEC] Error derivant clau PBKDF2");
+    return false;
+  }
+  prefs.begin("blau_tx", false);
+  prefs.putBytes("aes_key", key, BLAU_AES_KEY_LEN);
+  if (!prefs.isKey("nonce_ctr")) {
+    prefs.putUInt("nonce_ctr", blau_random_initial_nonce());
+  }
+  prefs.end();
+  bool ok = blau_crypto_set_key(key);
+  Serial.println("[SEC] Clau v2 derivada i guardada (password no persistit)");
+  return ok;
+}
+
+// Esborra la clau i el nonce. El dispositiu torna a enviar v1 en clar.
+void clearSecurity() {
+  prefs.begin("blau_tx", false);
+  prefs.clear();
+  prefs.end();
+  blau_crypto_clear_key();
+  Serial.println("[SEC] Seguretat esborrada — mode v1 legacy");
+}
+
+bool securityConfigured() {
+  return blau_crypto_has_key();
+}
+
+// Llegeix el nonce actual i persisteix n+1 ABANS d'enviar: si hi ha un
+// crash entre lectura i enviament, mai es reutilitza un nonce.
+// 1 escriptura NVS per pulsació (~100/dia) és acceptable per a la flash.
+uint32_t getNextNonce() {
+  prefs.begin("blau_tx", false);
+  uint32_t n = prefs.getUInt("nonce_ctr", 0);
+  if (n == 0) n = blau_random_initial_nonce();
+  prefs.putUInt("nonce_ctr", n + 1);
+  prefs.end();
+  return n;
 }
 
 // Retorna el canal Wi-Fi cached a NVS (1–13), o 0 si no n'hi ha cap de vàlid.

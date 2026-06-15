@@ -26,6 +26,7 @@ extern String strMac;
 extern char   macStr[18];
 extern byte   receiverMac[6];
 extern String receiverSSID;
+extern String g_device_name;
 
 extern String myAddresss, myAddresssDoted, myAddresssEnd;
 

@@ -1,6 +1,6 @@
 /**
  * @file    blauprotocol.h
- * @brief   BlauProtocol v1 — Nucli comú compartit entre BlauClick i BlauTrigger
+ * @brief   BlauProtocol v1 — Nucli comú compartit entre BlauLink i BlauLux
  *
  * Paquet binari fix de 10 bytes transmès via ESP-NOW.
  *
@@ -27,17 +27,20 @@ extern "C" {
 #define BLAU_PROTO_VERSION    0x01u
 #define BLAU_PACKET_SIZE      10u     /* sizeof(BlauPacket_t) ha de ser sempre 10 */
 
+#define BLAU_PROTO_VERSION_V2 0x02u   /* BlauProtocol v2 — paquet xifrat (blauprotocol_crypto.h) */
+#define BLAU_V2_PACKET_SIZE   21u     /* sizeof(BlauPacketV2_t): ver(1)+cipher(8)+nonce(4)+tag(8) */
+
 /* =========================================================
  * Tipus de missatge  (camp 'type')
  * ========================================================= */
 
-#define TYPE_EVENT            0x01u   /* Event de polsador — BlauClick → BlauTrigger */
-#define TYPE_CMD              0x02u   /* Comanda directa  — qualsevol → BlauTrigger */
-#define TYPE_ACK              0x03u   /* Confirmació d'execució — BlauTrigger → BlauClick */
+#define TYPE_EVENT            0x01u   /* Event de polsador — BlauLink → BlauLux */
+#define TYPE_CMD              0x02u   /* Comanda directa  — qualsevol → BlauLux */
+#define TYPE_ACK              0x03u   /* Confirmació d'execució — BlauLux → BlauLink */
 #define TYPE_PING             0x04u   /* Comprovació de presència */
 #define TYPE_PONG             0x05u   /* Resposta al ping */
 #define TYPE_STATUS_REQ       0x06u   /* Sol·licitud d'estat */
-#define TYPE_STATUS_RSP       0x07u   /* Resposta d'estat — BlauTrigger → qualsevol */
+#define TYPE_STATUS_RSP       0x07u   /* Resposta d'estat — BlauLux → qualsevol */
 
 /* =========================================================
  * Events de polsador  (camp 'cmd' quan type == TYPE_EVENT)
@@ -101,8 +104,8 @@ extern "C" {
  * Escalabilitat
  * ========================================================= */
 
-#define BLAU_MAX_SOURCES      8u      /* Màxim de BlauClicks que pot gestionar un Trigger */
-#define BLAU_MAX_TARGETS      4u      /* Màxim de BlauTriggers que pot tenir un Click */
+#define BLAU_MAX_SOURCES      8u      /* Màxim de BlauLinks que pot gestionar un Trigger */
+#define BLAU_MAX_TARGETS      4u      /* Màxim de BlauLux que pot tenir un Link */
 
 /* =========================================================
  * Estructura del paquet  — sizeof MUST == BLAU_PACKET_SIZE (10)

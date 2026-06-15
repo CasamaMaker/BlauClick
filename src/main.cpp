@@ -55,6 +55,7 @@ String strMac;
 char macStr[18];
 byte receiverMac[6];
 String receiverSSID = "";
+String g_device_name = WIFI_SSID;
 
 // ── 1-click command ──────────────────────────────────────────────
 uint8_t g_cmd1 = 0x01u;  // CMD_TOGGLE per defecte
@@ -156,6 +157,7 @@ void setup() {
   #endif
 
   loadCmdConfig();
+  loadSecurityConfig();   // BlauProtocol v2: clau AES ("blau_tx")
 
   batteryVoltage = getBatteryVoltage();
   batteryLevel   = calculateBatteryPercentage(batteryVoltage);

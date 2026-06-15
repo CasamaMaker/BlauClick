@@ -60,6 +60,17 @@
       </div>
 
       <div class="card">
+        <label data-i18n="espnowTitle">ESP-NOW</label>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <span style="font-size:0.9em; color:#555;" data-i18n="secStatus">Estat</span>
+          <span id="espnowStatusBadge" style="font-size:0.9em; font-weight:600; color:#888;">···</span>
+        </div>
+        <div style="font-size:0.82em; color:#555;">
+          <span data-i18n="espnowPeer">Receptor</span>: <span id="espnowPeer" style="font-weight:600;">···</span>
+        </div>
+      </div>
+
+      <div class="card">
         <div class="nav-grid">
           <button class="nav-btn" onclick="showPage('page-1click')">1 Click</button>
           <button class="nav-btn" onclick="showPage('page-2click')">2 Clicks</button>
@@ -177,6 +188,7 @@
       <button class="back-btn" onclick="showPage('page-index')" data-i18n="navBack">&#8592; Enrere</button>
       <div class="card">
         <button class="nav-btn" onclick="showPage('page-config-hardware')" data-i18n="navHardware">Hardware</button>
+        <button class="nav-btn" onclick="showPage('page-config-seguretat')" data-i18n="navSeguretat">Seguretat</button>
         <button class="nav-btn" onclick="showPage('page-config-altres')" data-i18n="navAltres">Altres</button>
       </div>
     </div>
@@ -232,9 +244,39 @@
     <!-- Pàgina: Config Altres -->
     <div id="page-config-altres" class="page">
       <button class="back-btn" onclick="showPage('page-configuracio')" data-i18n="navBack">&#8592; Enrere</button>
+
       <div class="card">
-        <label data-i18n="navAltres">Altres</label>
-        <p data-i18n="comingSoon">Pròximament...</p>
+        <label data-i18n="altresTitle">Nom del dispositiu</label>
+        <label for="deviceNameInput" style="font-size:0.9em;" data-i18n="altresName">Nom</label>
+        <input type="text" id="deviceNameInput" placeholder="BlauClick" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" maxlength="32" />
+        <span style="font-size:0.78em; color:#888; margin:3px 0 10px; display:block;" data-i18n="altresHint">Nom usat com a base del SSID de l'AP (ex: Nom_XXXX)</span>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <button class="btn" type="button" onclick="saveDeviceName()" data-i18n="altresSaveBtn">Guardar</button>
+          <button class="btn btn-secondary" id="clearAltresBtn" type="button" onclick="confirmClearAltres()" data-i18n="clearAltresBtn">Esborrar nom</button>
+        </div>
+        <p id="altresMsg" style="font-size:0.85em; margin:8px 0 0; min-height:1.2em;"></p>
+      </div>
+    </div>
+
+    <!-- Pàgina: Config Seguretat -->
+    <div id="page-config-seguretat" class="page">
+      <button class="back-btn" onclick="showPage('page-configuracio')" data-i18n="navBack">&#8592; Enrere</button>
+
+      <div class="card" style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px;">
+        <span style="font-size:0.9em; color:#555;" data-i18n="secStatus">Estat</span>
+        <span id="secStatusBadge" style="font-size:0.9em; font-weight:600; color:#888;">···</span>
+      </div>
+
+      <div class="card">
+        <label data-i18n="secTitle">Seguretat ESP-NOW (BlauProtocol v2)</label>
+        <label for="secPassInput" style="font-size:0.9em;" data-i18n="secPass">Contrasenya (8–63 caràcters)</label>
+        <input type="text" id="secPassInput" placeholder="" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" maxlength="63" />
+        <span style="font-size:0.78em; color:#888; margin:3px 0 10px; display:block;" data-i18n="secHint">Introdueix la mateixa contrasenya a BlauClick i BlauLux</span>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <button class="btn" type="button" onclick="saveSecurityPass()" data-i18n="secSaveBtn">Guardar</button>
+          <button class="btn btn-secondary" id="clearSecBtn" type="button" onclick="confirmClearSecurity()" data-i18n="secClearBtn">Esborrar seguretat</button>
+        </div>
+        <p id="secMsg" style="font-size:0.85em; margin:8px 0 0; min-height:1.2em;"></p>
       </div>
     </div>
   </div>

@@ -1,6 +1,6 @@
 /**
  * @file    blauprotocol_trg.h
- * @brief   BlauProtocol v1 — Funcions d'ajuda per al costat receptor (BlauTrigger)
+ * @brief   BlauProtocol v1 — Funcions d'ajuda per al costat receptor (BlauLux)
  *
  * Inclou:
  *   - Validació i parsejat de paquets rebuts (blau_parse_packet)
@@ -15,7 +15,7 @@
  *   - Lectura/escriptura EEPROM
  *   - Lògica de control de càrrega
  *
- * Ús típic al BlauTrigger:
+ * Ús típic al BlauLux:
  *
  *   // Callback d'acció — implementar a main.cpp
  *   uint8_t handleAction(uint8_t type, uint8_t cmd,
@@ -297,7 +297,7 @@ static inline void blau_print_packet(const BlauPacket_t *pkt)
 /* =========================================================
  * blau_action_fn_t
  *
- * Prototip del callback d'acció que el BlauTrigger ha de
+ * Prototip del callback d'acció que el BlauLux ha de
  * implementar a main.cpp. Rep el tipus i comanda del paquet
  * i retorna el codi ACK_* resultant.
  *
@@ -310,13 +310,99 @@ typedef uint8_t (*blau_action_fn_t)(uint8_t pkt_type, uint8_t cmd,
                                      uint8_t p1, uint8_t p2, uint8_t p3);
 
 /* =========================================================
+ * blau_trg_handle_packet
+ *
+ * Nucli de processament d'un paquet ja validat (post-parse o
+ * post-desxifrat v2): deduplicació, routing per tipus,
+ * construcció de resposta (ACK/PONG/STATUS_RSP) i cua pendent.
+ *
+ * @param pkt              Paquet validat (v1 natiu o reconstruït des de v2)
+ * @param mac              MAC del remitent
+ * @param ack_pending      Flag de resposta pendent (escrit aquí, llegit al loop)
+ * @param ack_mac_out      Buffer de 6 bytes on guardar la MAC destinatària
+ * @param ack_pkt_out      Paquet de resposta a enviar
+ * @param action_cb        Callback per executar l'acció (EVT/CMD → ACK status)
+ * @param is_on            Estat actual de la càrrega (per STATUS_RSP)
+ * @param brightness       Brillantor actual 0–100 (per STATUS_RSP)
+ * @param ctrl_type        Tipus de control configurat (per STATUS_RSP)
+ * @param force_duplicate  true → tractar com a duplicat sense executar
+ *                         (usat per v2 quan nonce == max_nonce: reintent
+ *                         d'un paquet ja executat → respondre ACK_DUPLICATE)
+ * ========================================================= */
+static inline void blau_trg_handle_packet(const BlauPacket_t *pkt_in,
+                                           const uint8_t      *mac,
+                                           volatile bool      *ack_pending,
+                                           uint8_t            *ack_mac_out,
+                                           BlauPacket_t       *ack_pkt_out,
+                                           blau_action_fn_t    action_cb,
+                                           bool                is_on,
+                                           uint8_t             brightness,
+                                           uint8_t             ctrl_type,
+                                           bool                force_duplicate)
+{
+    BlauPacket_t pkt;
+    memcpy(&pkt, pkt_in, sizeof(BlauPacket_t));
+
+    bool    dup      = force_duplicate || blau_is_duplicate(pkt.src_id, pkt.seq);
+    uint8_t ack_s    = ACK_OK;
+    bool    need_ack = true;
+
+    switch (pkt.type) {
+
+        case TYPE_EVENT:
+        case TYPE_CMD:
+            if (dup) {
+                ack_s = ACK_DUPLICATE;
+                Serial.println("[BlauLux] Duplicat ignorat");
+            } else {
+                ack_s = action_cb(pkt.type, pkt.cmd, pkt.p1, pkt.p2, pkt.p3);
+            }
+            break;
+
+        case TYPE_PING:
+            blau_build_pong(ack_pkt_out, pkt.seq);
+            memcpy(ack_mac_out, mac, 6);
+            *ack_pending = true;
+            need_ack = false;
+            Serial.print("[BlauLux] PING rebut, PONG pendent seq=");
+            Serial.println(pkt.seq);
+            break;
+
+        case TYPE_STATUS_REQ:
+            blau_build_status_rsp(ack_pkt_out, pkt.seq, is_on, brightness, ctrl_type);
+            memcpy(ack_mac_out, mac, 6);
+            *ack_pending = true;
+            need_ack = false;
+            Serial.println("[BlauLux] STATUS_REQ rebut, STATUS_RSP pendent");
+            break;
+
+        default:
+            Serial.print("[BlauLux] Tipus desconegut ignorat: 0x");
+            Serial.println(pkt.type, HEX);
+            need_ack = false;
+            break;
+    }
+
+    if (need_ack) {
+        memcpy(ack_mac_out, mac, 6);
+        blau_build_ack(ack_pkt_out, pkt.seq, ack_s);
+        *ack_pending = true;
+        Serial.print("[BlauLux] ACK pendent (");
+        Serial.print(ack_s == ACK_OK        ? "OK"  :
+                     ack_s == ACK_DUPLICATE ? "DUP" : "ERR");
+        Serial.print(") seq=");
+        Serial.println(pkt.seq);
+    }
+}
+
+/* =========================================================
  * blau_trg_on_data_recv
  *
- * Processador complet de paquets rebuts al costat BlauTrigger.
+ * Processador complet de paquets v1 rebuts al costat BlauLux.
  * Cridar des del callback OnDataRecv d'ESP-NOW.
  *
- * Gestiona: validació, deduplicació, routing per tipus,
- * construcció de resposta (ACK/PONG/STATUS_RSP) i cua pendent.
+ * Valida el paquet (mida, CRC, versió) i delega el processament
+ * a blau_trg_handle_packet().
  *
  * IMPORTANT: és cridada des d'un context d'interrupció (ESP-NOW
  * callback). No fa operacions bloquejants. L'enviament de la
@@ -346,61 +432,13 @@ static inline void blau_trg_on_data_recv(const uint8_t    *mac,
 {
     BlauPacket_t pkt;
     if (!blau_parse_packet(data, len, &pkt)) {
-        Serial.println("[BlauTrigger] Paquet invàlid (mida, CRC o versió)");
+        Serial.println("[BlauLux] Paquet invàlid (mida, CRC o versió)");
         return;
     }
     blau_print_packet(&pkt);
 
-    bool    dup      = blau_is_duplicate(pkt.src_id, pkt.seq);
-    uint8_t ack_s    = ACK_OK;
-    bool    need_ack = true;
-
-    switch (pkt.type) {
-
-        case TYPE_EVENT:
-        case TYPE_CMD:
-            if (dup) {
-                ack_s = ACK_DUPLICATE;
-                Serial.println("[BlauTrigger] Duplicat ignorat");
-            } else {
-                ack_s = action_cb(pkt.type, pkt.cmd, pkt.p1, pkt.p2, pkt.p3);
-            }
-            break;
-
-        case TYPE_PING:
-            blau_build_pong(ack_pkt_out, pkt.seq);
-            memcpy(ack_mac_out, mac, 6);
-            *ack_pending = true;
-            need_ack = false;
-            Serial.print("[BlauTrigger] PING rebut, PONG pendent seq=");
-            Serial.println(pkt.seq);
-            break;
-
-        case TYPE_STATUS_REQ:
-            blau_build_status_rsp(ack_pkt_out, pkt.seq, is_on, brightness, ctrl_type);
-            memcpy(ack_mac_out, mac, 6);
-            *ack_pending = true;
-            need_ack = false;
-            Serial.println("[BlauTrigger] STATUS_REQ rebut, STATUS_RSP pendent");
-            break;
-
-        default:
-            Serial.print("[BlauTrigger] Tipus desconegut ignorat: 0x");
-            Serial.println(pkt.type, HEX);
-            need_ack = false;
-            break;
-    }
-
-    if (need_ack) {
-        memcpy(ack_mac_out, mac, 6);
-        blau_build_ack(ack_pkt_out, pkt.seq, ack_s);
-        *ack_pending = true;
-        Serial.print("[BlauTrigger] ACK pendent (");
-        Serial.print(ack_s == ACK_OK        ? "OK"  :
-                     ack_s == ACK_DUPLICATE ? "DUP" : "ERR");
-        Serial.print(") seq=");
-        Serial.println(pkt.seq);
-    }
+    blau_trg_handle_packet(&pkt, mac, ack_pending, ack_mac_out, ack_pkt_out,
+                           action_cb, is_on, brightness, ctrl_type, false);
 }
 
 /* =========================================================
@@ -409,7 +447,7 @@ static inline void blau_trg_on_data_recv(const uint8_t    *mac,
  * Envia la resposta pendent (ACK/PONG/STATUS_RSP) via ESP-NOW.
  * Cridar des de loop() en cada iteració.
  *
- * Registra automàticament el peer si cal (WIFI_IF_AP per BlauTrigger).
+ * Registra automàticament el peer si cal (WIFI_IF_AP per BlauLux).
  *
  * @param ack_pending  Flag de resposta pendent (netejat aquí)
  * @param ack_mac      MAC del destinatari
@@ -431,7 +469,7 @@ static inline void blau_trg_process_pending(volatile bool       *ack_pending,
         esp_now_add_peer(&p);
     }
     esp_err_t r = esp_now_send(ack_mac, (const uint8_t *)ack_pkt, sizeof(BlauPacket_t));
-    Serial.print("[BlauTrigger] ACK esp_now_send: 0x");
+    Serial.print("[BlauLux] ACK esp_now_send: 0x");
     Serial.println(r, HEX);
 }
 

@@ -23,7 +23,7 @@ void wifiApModeServer() {
   // WiFi.mode(WIFI_STA);
   WiFi.mode(WIFI_AP);
   getMyMacAddress();
-  String fullSSID = String(WIFI_SSID) + "_" + myAddresssEnd;
+  String fullSSID = g_device_name + "_" + myAddresssEnd;
   WiFi.softAP(fullSSID.c_str(), WIFI_PASSWORD);
   Serial.printf("[WIFI] AP ok: %s  IP: %s\n", fullSSID.c_str(), WiFi.softAPIP().toString().c_str());
 
