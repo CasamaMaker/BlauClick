@@ -214,6 +214,7 @@
       if (id === 'page-config-hardware') hwInit();
       if (id === 'page-config-seguretat') fetchSecurityStatus();
       if (id === 'page-config-altres') fetchDeviceName();
+      if (id === 'page-ota') fetchOtaVersion();
     }
 
     // ── ESP-NOW / BlauProtocol v2 estat ────────────────────────────
@@ -390,6 +391,44 @@
     function onCmdChange(val) {
       document.getElementById('brightnessControl').style.display = (val === '4') ? 'block' : 'none';
       document.getElementById('rgbControl').style.display        = (val === '5') ? 'block' : 'none';
+    }
+
+    // ── OTA ──────────────────────────────────────────────────────────
+
+    function fetchOtaVersion() {
+      apiGetInfo(function(info) {
+        var el = document.getElementById('otaVersion');
+        if (el && info.version) el.textContent = t('otaCurrentVer') + info.version;
+      });
+    }
+
+    function startOTA() {
+      var file = document.getElementById('otaFile').files[0];
+      if (!file) { _otaMsg(t('otaNoFile'), false); return; }
+      var xhr = new XMLHttpRequest();
+      xhr.upload.onprogress = function(e) {
+        if (!e.lengthComputable) return;
+        var pct = Math.round(e.loaded / e.total * 100);
+        document.getElementById('otaProgress').value = pct;
+        document.getElementById('otaPct').textContent = pct + '%';
+      };
+      xhr.onload = function() {
+        var ok = false;
+        try { ok = JSON.parse(xhr.responseText).ok; } catch(e) {}
+        _otaMsg(ok ? t('otaOk') : t('otaError'), !ok);
+      };
+      xhr.onerror = function() { _otaMsg(t('otaError'), true); };
+      var form = new FormData();
+      form.append('file', file, file.name);
+      document.getElementById('otaProgressWrap').style.display = 'block';
+      _otaMsg(t('otaUploading'), false);
+      xhr.open('POST', '/ota-upload');
+      xhr.send(form);
+    }
+
+    function _otaMsg(text, isError) {
+      var el = document.getElementById('otaStatus');
+      if (el) { el.textContent = text; el.style.color = isError ? '#e74c3c' : '#555'; }
     }
 
     function saveCmdConfig() {

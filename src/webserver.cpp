@@ -3,6 +3,7 @@
 #include <FS.h>
 #include <LittleFS.h>
 #include <esp_sleep.h>
+#include <Update.h>
 #include "ESPAsyncWebServer.h"
 #include "config.h"
 #include "globals.h"
@@ -340,6 +341,60 @@ void webServerSetup() {
     delay(200);
     ESP.restart();
   });
+
+  // ── OTA update ───────────────────────────────────────────────
+  server.on("/ota-upload", HTTP_POST,
+    [](AsyncWebServerRequest *r) {
+      bool ok = !Update.hasError();
+      r->send(200, "application/json",
+        ok ? "{\"ok\":true}"
+           : String("{\"ok\":false,\"err\":\"") + Update.errorString() + "\"}");
+      if (ok) { delay(200); ESP.restart(); }
+    },
+    [](AsyncWebServerRequest*, const String&, size_t index,
+       uint8_t *data, size_t len, bool) {
+      static uint32_t _app_sz, _lfs_sz, _written, _phase, _hdr_bytes;
+      static uint8_t  _hdr[12];
+
+      if (index == 0) {
+        _app_sz = _lfs_sz = _written = _phase = _hdr_bytes = 0;
+        Update.abort();
+      }
+
+      size_t off = 0;
+      if (_hdr_bytes < 12) {
+        size_t take = min((size_t)(12 - _hdr_bytes), len);
+        memcpy(_hdr + _hdr_bytes, data, take);
+        _hdr_bytes += take;
+        off += take;
+        if (_hdr_bytes < 12) return;
+        if (memcmp(_hdr, "BLAU", 4) != 0) { Update.abort(); return; }
+        memcpy(&_app_sz, _hdr + 4, 4);
+        memcpy(&_lfs_sz, _hdr + 8, 4);
+        if (!Update.begin(_app_sz, U_FLASH)) { Update.abort(); return; }
+        _phase = 0; _written = 0;
+      }
+
+      uint8_t *ptr = data + off;
+      size_t   rem = len  - off;
+      while (rem > 0) {
+        if (_phase == 0) {
+          size_t can = min((size_t)(_app_sz - _written), rem);
+          if (can > 0) { Update.write(ptr, can); _written += can; ptr += can; rem -= can; }
+          if (_written >= _app_sz) {
+            Update.end(true);
+            if (_lfs_sz > 0 && Update.begin(_lfs_sz, U_SPIFFS)) {
+              _phase = 1; _written = 0;
+            } else { _phase = 2; }
+          }
+        } else if (_phase == 1) {
+          size_t can = min((size_t)(_lfs_sz - _written), rem);
+          if (can > 0) { Update.write(ptr, can); _written += can; ptr += can; rem -= can; }
+          if (_written >= _lfs_sz) { Update.end(true); _phase = 2; }
+        } else { break; }
+      }
+    }
+  );
 
   server.onNotFound(serveixWifiManager);
   server.begin();

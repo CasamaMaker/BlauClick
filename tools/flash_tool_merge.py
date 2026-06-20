@@ -324,6 +324,16 @@ class MergeFlashTool(tk.Tk):
         )
         self._erase_btn.pack(side="left", padx=12)
 
+        self._ota_btn = tk.Button(
+            btn_frame, text="  EXPORT OTA  ",
+            bg="#27ae60", fg="white",
+            activebackground="#2ecc71", activeforeground="white",
+            font=("TkDefaultFont", 11, "bold"),
+            relief="flat", padx=22, pady=8, cursor="hand2",
+            command=self._start_export_ota,
+        )
+        self._ota_btn.pack(side="left", padx=12)
+
         # ── Consola ───────────────────────────────────────────────────
         ttk.Separator(outer, orient="horizontal").pack(fill="x", pady=(8, 4))
         tk.Label(outer, text="Consola:", anchor="w").pack(anchor="w")
@@ -402,6 +412,7 @@ class MergeFlashTool(tk.Tk):
         state = "disabled" if busy else "normal"
         self._flash_btn.configure(state=state)
         self._erase_btn.configure(state=state)
+        self._ota_btn.configure(state=state)
         merge_state = "disabled" if (busy or self._mode_var.get() == "merged") else "normal"
         self._merge_btn.configure(state=merge_state)
 
@@ -553,6 +564,52 @@ class MergeFlashTool(tk.Tk):
         ]
         self._set_busy(True)
         threading.Thread(target=self._run_cmd, args=(cmd,), daemon=True).start()
+
+
+    def _start_export_ota(self):
+        fw_result  = self._rows[3].get()
+        lfs_result = self._rows[4].get()
+
+        if fw_result is None or not pathlib.Path(fw_result[1]).is_file():
+            messagebox.showerror("Fitxer no trobat",
+                                 "firmware.bin no existeix. Compila primer amb PlatformIO.")
+            return
+        if lfs_result is None or not pathlib.Path(lfs_result[1]).is_file():
+            messagebox.showerror("Fitxer no trobat",
+                                 "littlefs.bin no existeix. Executa 'Build Filesystem Image' primer.")
+            return
+
+        chip    = self._chip_var.get()
+        version = _get_version()
+        rel_dir = ROOT / "release" / version
+        rel_dir.mkdir(parents=True, exist_ok=True)
+
+        output = filedialog.asksaveasfilename(
+            title="Desa el binari OTA",
+            defaultextension=".bin",
+            initialdir=str(rel_dir),
+            initialfile=f"{ROOT.name}_{version}_{chip}_ota.bin",
+            filetypes=[("Fitxers binaris", "*.bin"), ("Tots els fitxers", "*.*")],
+        )
+        if not output:
+            return
+
+        fw_data  = pathlib.Path(fw_result[1]).read_bytes()
+        lfs_data = pathlib.Path(lfs_result[1]).read_bytes()
+
+        with open(output, "wb") as f:
+            f.write(b"BLAU")
+            f.write(struct.pack("<II", len(fw_data), len(lfs_data)))
+            f.write(fw_data)
+            f.write(lfs_data)
+
+        self._log_queue.put(f"\n{'─' * 64}\n")
+        self._log_queue.put(f"EXPORT OTA → {output}\n")
+        self._log_queue.put(f"  firmware:  {len(fw_data):,} bytes\n")
+        self._log_queue.put(f"  littlefs:  {len(lfs_data):,} bytes\n")
+        self._log_queue.put(f"  total:     {12 + len(fw_data) + len(lfs_data):,} bytes\n")
+        self._log_queue.put(f"{'─' * 64}\n")
+        self._log_queue.put("✓  Binari OTA generat. Puja'l via web > Configuració > Actualitzar.\n")
 
 
 if __name__ == "__main__":
