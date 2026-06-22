@@ -212,7 +212,7 @@ class MergeFlashTool(tk.Tk):
         tk.Label(top, text="Chip:", width=6, anchor="w").pack(side="left")
         self._chip_var = tk.StringVar(value=CHIPS[0])
         chip_cb = ttk.Combobox(top, textvariable=self._chip_var,
-                               values=CHIPS, state="readonly", width=12)
+                               values=[*CHIPS, "Tots"], state="readonly", width=12)
         chip_cb.pack(side="left", padx=(0, 24))
         chip_cb.bind("<<ComboboxSelected>>", lambda _: self._on_chip_changed())
 
@@ -289,6 +289,16 @@ class MergeFlashTool(tk.Tk):
         self._merged_row = FileRow(inner_m, "merged.bin", 0)
         self._merged_row.set("0x0", "")
 
+        # ── Vista: Tots els xips ──────────────────────────────────────
+        self._tots_frame = tk.Frame(self._selection_area)
+        tk.Label(
+            self._tots_frame,
+            text="Mode «Tots els xips»: MERGE i EXPORT OTA s'executaran per a cada xip "
+                 f"({', '.join(CHIPS)}) de forma seqüencial.",
+            fg="#666666", font=("TkDefaultFont", 9, "italic"),
+            wraplength=520, justify="left",
+        ).pack(padx=6, pady=12, anchor="w")
+
         # ── Botons FLASH / ERASE ──────────────────────────────────────
         ttk.Separator(outer, orient="horizontal").pack(fill="x", pady=8)
         btn_frame = tk.Frame(outer)
@@ -353,15 +363,16 @@ class MergeFlashTool(tk.Tk):
         sb.pack(side="right", fill="y")
 
     def _on_mode_changed(self):
+        if self._chip_var.get() == "Tots":
+            return
         if self._mode_var.get() == "components":
             self._merged_frame.pack_forget()
             self._components_frame.pack(fill="x")
-            self._merge_btn.configure(state="normal")
         else:
             self._components_frame.pack_forget()
             self._merged_frame.pack(fill="x")
-            self._merge_btn.configure(state="disabled")
             self._auto_fill_merged()
+        self._update_button_states()
 
     def _auto_fill_merged(self):
         chip      = self._chip_var.get()
@@ -371,7 +382,23 @@ class MergeFlashTool(tk.Tk):
             self._merged_row.set("0x0", str(candidate))
 
     def _on_chip_changed(self):
-        chip      = self._chip_var.get()
+        chip = self._chip_var.get()
+
+        if chip == "Tots":
+            self._components_frame.pack_forget()
+            self._merged_frame.pack_forget()
+            self._tots_frame.pack(fill="x")
+            self._update_button_states()
+            return
+
+        self._tots_frame.pack_forget()
+        if self._mode_var.get() == "components":
+            self._merged_frame.pack_forget()
+            self._components_frame.pack(fill="x")
+        else:
+            self._components_frame.pack_forget()
+            self._merged_frame.pack(fill="x")
+
         env_dir   = BUILD_DIR / chip
         boot_app0 = _find_boot_app0()
         fs_offset = _find_fs_offset(env_dir / "partitions.bin")
@@ -387,6 +414,18 @@ class MergeFlashTool(tk.Tk):
             row.set(addr, path)
         if self._mode_var.get() == "merged":
             self._auto_fill_merged()
+
+        self._update_button_states()
+
+    def _update_button_states(self, busy: bool = False):
+        is_all         = self._chip_var.get() == "Tots"
+        is_merged_mode = self._mode_var.get() == "merged"
+
+        self._flash_btn.configure(state="disabled" if (busy or is_all) else "normal")
+        self._erase_btn.configure(state="disabled" if (busy or is_all) else "normal")
+        self._ota_btn.configure(state="disabled" if busy else "normal")
+        merge_disabled = busy or (not is_all and is_merged_mode)
+        self._merge_btn.configure(state="disabled" if merge_disabled else "normal")
 
     def _refresh_ports(self):
         ports = list_serial_ports()
@@ -409,14 +448,10 @@ class MergeFlashTool(tk.Tk):
         self.after(80, self._poll_log)
 
     def _set_busy(self, busy: bool):
-        state = "disabled" if busy else "normal"
-        self._flash_btn.configure(state=state)
-        self._erase_btn.configure(state=state)
-        self._ota_btn.configure(state=state)
-        merge_state = "disabled" if (busy or self._mode_var.get() == "merged") else "normal"
-        self._merge_btn.configure(state=merge_state)
+        self._update_button_states(busy=busy)
 
-    def _run_cmd(self, cmd: list):
+    def _run_cmd_raw(self, cmd: list) -> bool:
+        """Executa una comanda, registra la sortida. Retorna True si èxit."""
         env = os.environ.copy()
         env["PYTHONUTF8"] = "1"
         env["PYTHONIOENCODING"] = "utf-8"
@@ -438,10 +473,17 @@ class MergeFlashTool(tk.Tk):
             proc.wait()
             if proc.returncode == 0:
                 self._log_queue.put("\n✓  Operació completada correctament.\n")
+                return True
             else:
                 self._log_queue.put(f"\n✗  Error (codi de sortida {proc.returncode}).\n")
+                return False
         except Exception as exc:
             self._log_queue.put(f"\n✗  Excepció: {exc}\n")
+            return False
+
+    def _run_cmd(self, cmd: list):
+        try:
+            self._run_cmd_raw(cmd)
         finally:
             self.after(0, lambda: self._set_busy(False))
 
@@ -462,6 +504,25 @@ class MergeFlashTool(tk.Tk):
             return None
         return entries
 
+    def _collect_chip_entries(self, chip: str) -> list[str]:
+        """Retorna [addr, path, ...] per un xip des del build dir (ignorant fitxers que falten)."""
+        env_dir   = BUILD_DIR / chip
+        boot_app0 = _find_boot_app0()
+        fs_offset = _find_fs_offset(env_dir / "partitions.bin")
+
+        candidates = [
+            (BOOTLOADER_OFFSET.get(chip, "0x0000"), env_dir / "bootloader.bin"),
+            (PARTITIONS_OFFSET,                     env_dir / "partitions.bin"),
+            (BOOT_APP0_OFFSET,                      boot_app0),
+            (FIRMWARE_OFFSET,                       env_dir / "firmware.bin"),
+            (fs_offset,                             env_dir / "littlefs.bin" if fs_offset else None),
+        ]
+        entries = []
+        for addr, path in candidates:
+            if path and pathlib.Path(path).is_file():
+                entries.extend([addr, str(path)])
+        return entries
+
     def _start_merge(self):
         esptool = find_esptool()
         if esptool is None:
@@ -470,14 +531,25 @@ class MergeFlashTool(tk.Tk):
                 "No s'ha pogut localitzar esptool.\n\nInstal·la'l amb:\n  pip install esptool",
             )
             return
+
+        version = _get_version()
+        rel_dir = ROOT / "release" / version
+        rel_dir.mkdir(parents=True, exist_ok=True)
+
+        if self._chip_var.get() == "Tots":
+            self._set_busy(True)
+            threading.Thread(
+                target=self._merge_all_chips_thread,
+                args=(esptool, version, rel_dir),
+                daemon=True,
+            ).start()
+            return
+
         entries = self._collect_entries()
         if entries is None:
             return
 
-        chip    = self._chip_var.get()
-        version = _get_version()
-        rel_dir = ROOT / "release" / version
-        rel_dir.mkdir(parents=True, exist_ok=True)
+        chip   = self._chip_var.get()
         output = filedialog.asksaveasfilename(
             title="Desa el binari fusionat",
             defaultextension=".bin",
@@ -488,16 +560,25 @@ class MergeFlashTool(tk.Tk):
         if not output:
             return
 
-        cmd = [
-            *esptool,
-            "--chip", chip,
-            "merge_bin",
-            "--output", output,
-            *entries,
-        ]
+        cmd = [*esptool, "--chip", chip, "merge_bin", "--output", output, *entries]
         self._set_busy(True)
         self._log_queue.put(f"\nSortida: {output}\n")
         threading.Thread(target=self._run_cmd, args=(cmd,), daemon=True).start()
+
+    def _merge_all_chips_thread(self, esptool: list, version: str, rel_dir: pathlib.Path):
+        try:
+            for chip in CHIPS:
+                entries = self._collect_chip_entries(chip)
+                if not entries:
+                    self._log_queue.put(f"\n⚠  {chip}: no s'han trobat fitxers de build. Saltant.\n")
+                    continue
+                output = str(rel_dir / f"{ROOT.name}_{version}_{chip}.bin")
+                self._log_queue.put(f"\n▶  Processant {chip}...\n")
+                self._run_cmd_raw([*esptool, "--chip", chip, "merge_bin", "--output", output, *entries])
+                self._log_queue.put(f"   Sortida: {output}\n")
+            self._log_queue.put(f"\n✓  MERGE completat per a tots els xips.\n")
+        finally:
+            self.after(0, lambda: self._set_busy(False))
 
     def _start_flash(self):
         esptool = find_esptool()
@@ -565,8 +646,19 @@ class MergeFlashTool(tk.Tk):
         self._set_busy(True)
         threading.Thread(target=self._run_cmd, args=(cmd,), daemon=True).start()
 
-
     def _start_export_ota(self):
+        if self._chip_var.get() == "Tots":
+            version = _get_version()
+            rel_dir = ROOT / "release" / version
+            rel_dir.mkdir(parents=True, exist_ok=True)
+            self._set_busy(True)
+            threading.Thread(
+                target=self._export_ota_all_thread,
+                args=(version, rel_dir),
+                daemon=True,
+            ).start()
+            return
+
         fw_result  = self._rows[3].get()
         lfs_result = self._rows[4].get()
 
@@ -610,6 +702,33 @@ class MergeFlashTool(tk.Tk):
         self._log_queue.put(f"  total:     {12 + len(fw_data) + len(lfs_data):,} bytes\n")
         self._log_queue.put(f"{'─' * 64}\n")
         self._log_queue.put("✓  Binari OTA generat. Puja'l via web > Configuració > Actualitzar.\n")
+
+    def _export_ota_all_thread(self, version: str, rel_dir: pathlib.Path):
+        try:
+            for chip in CHIPS:
+                env_dir  = BUILD_DIR / chip
+                fw_path  = env_dir / "firmware.bin"
+                lfs_path = env_dir / "littlefs.bin"
+                if not fw_path.is_file() or not lfs_path.is_file():
+                    self._log_queue.put(f"\n⚠  {chip}: firmware.bin o littlefs.bin no trobats. Saltant.\n")
+                    continue
+                output   = str(rel_dir / f"{ROOT.name}_{version}_{chip}_ota.bin")
+                fw_data  = fw_path.read_bytes()
+                lfs_data = lfs_path.read_bytes()
+                with open(output, "wb") as f:
+                    f.write(b"BLAU")
+                    f.write(struct.pack("<II", len(fw_data), len(lfs_data)))
+                    f.write(fw_data)
+                    f.write(lfs_data)
+                self._log_queue.put(f"\n{'─' * 64}\n")
+                self._log_queue.put(f"EXPORT OTA [{chip}] → {output}\n")
+                self._log_queue.put(f"  firmware:  {len(fw_data):,} bytes\n")
+                self._log_queue.put(f"  littlefs:  {len(lfs_data):,} bytes\n")
+                self._log_queue.put(f"  total:     {12 + len(fw_data) + len(lfs_data):,} bytes\n")
+                self._log_queue.put(f"{'─' * 64}\n")
+            self._log_queue.put("✓  Export OTA completat per a tots els xips. Puja via web > Configuració > Actualitzar.\n")
+        finally:
+            self.after(0, lambda: self._set_busy(False))
 
 
 if __name__ == "__main__":
