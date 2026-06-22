@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-BlauClick Merge & Flash Tool
+BlauLux / BlauClick — Merge & Flash Tool (unificat)
 
-Grava els components individuals del firmware (bootloader, particions,
-boot_app0, firmware, filesystem) directament des del directori de build.
+Eina única per a BlauLux i BlauClick.
+Selecciona el projecte amb els radiobuttons a dalt a l'esquerra.
 
 Ús:
     python tools/flash_tool_merge.py
@@ -21,7 +21,14 @@ import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-ROOT = pathlib.Path(__file__).parent.parent
+_THIS_ROOT  = pathlib.Path(__file__).resolve().parent.parent
+_GITHUB_DIR = _THIS_ROOT.parent
+
+PROJECTS = {
+    "BlauLux":   _GITHUB_DIR / "BlauLux",
+    "BlauClick": _GITHUB_DIR / "BlauClick",
+}
+_DEFAULT_PROJECT = _THIS_ROOT.name if _THIS_ROOT.name in PROJECTS else next(iter(PROJECTS))
 
 BOOTLOADER_OFFSET = {
     "esp32":   "0x1000",
@@ -38,28 +45,6 @@ CHIPS = ["esp32c3", "esp32", "esp32s3", "esp32s2", "esp32c6"]
 
 _FS_NAMES    = {b"spiffs", b"littlefs", b"ffat", b"fs"}
 _FS_SUBTYPES = {0x82, 0x83}
-
-
-def _resolve_build_dir() -> pathlib.Path:
-    cfg = configparser.RawConfigParser()
-    cfg.read(ROOT / "platformio.ini", encoding="utf-8")
-    raw = cfg.get("platformio", "build_dir", fallback=None)
-    if raw:
-        return pathlib.Path(raw.strip())
-    return ROOT / ".pio" / "build"
-
-
-BUILD_DIR = _resolve_build_dir()
-
-
-def _get_version() -> str:
-    config_h = ROOT / "src" / "config.h"
-    if config_h.exists():
-        m = re.search(r'#define\s+FIRMWARE_VERSION\s+"([^"]+)"',
-                      config_h.read_text(encoding="utf-8"))
-        if m:
-            return f"v{m.group(1)}"
-    return "v0.0"
 
 
 def _find_pio_home() -> pathlib.Path | None:
@@ -147,7 +132,9 @@ def list_serial_ports() -> list[str]:
 class FileRow:
     """Fila: etiqueta + entrada adreça (editable) + entrada fitxer (editable) + browse."""
 
-    def __init__(self, parent: tk.Widget, label: str, row_idx: int):
+    def __init__(self, parent: tk.Widget, label: str, row_idx: int,
+                 default_dir: pathlib.Path | None = None):
+        self._default_dir = default_dir or pathlib.Path.cwd()
         self.addr_var = tk.StringVar()
         self.path_var = tk.StringVar()
 
@@ -168,7 +155,7 @@ class FileRow:
 
     def _browse(self):
         current = self.path_var.get()
-        initial = str(pathlib.Path(current).parent) if current else str(BUILD_DIR)
+        initial = str(pathlib.Path(current).parent) if current else str(self._default_dir)
         path = filedialog.askopenfilename(
             title="Selecciona el fitxer binari",
             initialdir=initial,
@@ -193,27 +180,58 @@ class FileRow:
 class MergeFlashTool(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("BlauClick — Merge & Flash Tool")
         self.resizable(True, False)
         self._log_queue: queue.Queue[str] = queue.Queue()
+        self._project_var = tk.StringVar(value=_DEFAULT_PROJECT)
+        self._proj_root = PROJECTS[_DEFAULT_PROJECT]
+        self._build_dir = self._resolve_build_dir()
+        self.title(f"{_DEFAULT_PROJECT} — Merge & Flash Tool")
         self._build_ui()
         self._refresh_ports()
         self._on_chip_changed()
         self._poll_log()
 
+    # ── Helpers dinàmics per projecte ────────────────────────────────
+
+    def _resolve_build_dir(self) -> pathlib.Path:
+        cfg = configparser.RawConfigParser()
+        cfg.read(self._proj_root / "platformio.ini", encoding="utf-8")
+        raw = cfg.get("platformio", "build_dir", fallback=None)
+        if raw:
+            return pathlib.Path(raw.strip())
+        return self._proj_root / ".pio" / "build"
+
+    def _get_version(self) -> str:
+        config_h = self._proj_root / "src" / "config.h"
+        if config_h.exists():
+            m = re.search(r'#define\s+FIRMWARE_VERSION\s+"([^"]+)"',
+                          config_h.read_text(encoding="utf-8"))
+            if m:
+                return f"v{m.group(1)}"
+        return "v0.0"
+
+    # ── UI ────────────────────────────────────────────────────────────
+
     def _build_ui(self):
         outer = tk.Frame(self, padx=12, pady=10)
         outer.pack(fill="both", expand=True)
 
-        # ── Chip + Port ───────────────────────────────────────────────
+        # ── Projecte + Chip + Port ────────────────────────────────────
         top = tk.Frame(outer)
         top.pack(fill="x", pady=(0, 6))
 
-        tk.Label(top, text="Chip:", width=6, anchor="w").pack(side="left")
+        tk.Label(top, text="Projecte:", anchor="w").pack(side="left", padx=(0, 4))
+        for name in PROJECTS:
+            ttk.Radiobutton(top, text=name, variable=self._project_var, value=name,
+                            command=self._on_project_changed).pack(side="left", padx=(0, 6))
+
+        ttk.Separator(top, orient="vertical").pack(side="left", fill="y", padx=(6, 12))
+
+        tk.Label(top, text="Chip:", anchor="w").pack(side="left", padx=(0, 4))
         self._chip_var = tk.StringVar(value=CHIPS[0])
         chip_cb = ttk.Combobox(top, textvariable=self._chip_var,
                                values=[*CHIPS, "Tots"], state="readonly", width=12)
-        chip_cb.pack(side="left", padx=(0, 24))
+        chip_cb.pack(side="left", padx=(0, 20))
         chip_cb.bind("<<ComboboxSelected>>", lambda _: self._on_chip_changed())
 
         tk.Label(top, text="Port:", anchor="w").pack(side="left", padx=(0, 4))
@@ -265,7 +283,7 @@ class MergeFlashTool(tk.Tk):
             "bootloader.bin", "partitions.bin", "boot_app0.bin",
             "firmware.bin",   "littlefs.bin",
         ]):
-            self._rows.append(FileRow(files_inner, label, i))
+            self._rows.append(FileRow(files_inner, label, i, default_dir=self._build_dir))
 
         # ── Vista: merged ─────────────────────────────────────────────
         self._merged_frame = tk.Frame(self._selection_area)
@@ -299,7 +317,7 @@ class MergeFlashTool(tk.Tk):
             wraplength=520, justify="left",
         ).pack(padx=6, pady=12, anchor="w")
 
-        # ── Botons FLASH / ERASE ──────────────────────────────────────
+        # ── Botons FLASH / MERGE / ERASE / EXPORT OTA ─────────────────
         ttk.Separator(outer, orient="horizontal").pack(fill="x", pady=8)
         btn_frame = tk.Frame(outer)
         btn_frame.pack()
@@ -362,6 +380,15 @@ class MergeFlashTool(tk.Tk):
         self._log.pack(side="left", fill="both", expand=True)
         sb.pack(side="right", fill="y")
 
+    # ── Handlers canvi estat ──────────────────────────────────────────
+
+    def _on_project_changed(self):
+        project = self._project_var.get()
+        self._proj_root      = PROJECTS[project]
+        self._build_dir = self._resolve_build_dir()
+        self.title(f"{project} — Merge & Flash Tool")
+        self._on_chip_changed()
+
     def _on_mode_changed(self):
         if self._chip_var.get() == "Tots":
             return
@@ -376,8 +403,8 @@ class MergeFlashTool(tk.Tk):
 
     def _auto_fill_merged(self):
         chip      = self._chip_var.get()
-        version   = _get_version()
-        candidate = ROOT / "release" / version / f"{ROOT.name}_{version}_{chip}.bin"
+        version   = self._get_version()
+        candidate = self._proj_root / "release" / version / f"{self._proj_root.name}_{version}_{chip}.bin"
         if candidate.is_file():
             self._merged_row.set("0x0", str(candidate))
 
@@ -399,7 +426,7 @@ class MergeFlashTool(tk.Tk):
             self._components_frame.pack_forget()
             self._merged_frame.pack(fill="x")
 
-        env_dir   = BUILD_DIR / chip
+        env_dir   = self._build_dir / chip
         boot_app0 = _find_boot_app0()
         fs_offset = _find_fs_offset(env_dir / "partitions.bin")
 
@@ -433,6 +460,8 @@ class MergeFlashTool(tk.Tk):
         if ports and not self._port_var.get():
             self._port_cb.current(0)
 
+    # ── Consola ───────────────────────────────────────────────────────
+
     def _log_append(self, text: str):
         self._log.configure(state="normal")
         self._log.insert("end", text)
@@ -446,6 +475,8 @@ class MergeFlashTool(tk.Tk):
         except queue.Empty:
             pass
         self.after(80, self._poll_log)
+
+    # ── Gestió busy / comandes ────────────────────────────────────────
 
     def _set_busy(self, busy: bool):
         self._update_button_states(busy=busy)
@@ -487,6 +518,8 @@ class MergeFlashTool(tk.Tk):
         finally:
             self.after(0, lambda: self._set_busy(False))
 
+    # ── Recollida entrades ────────────────────────────────────────────
+
     def _collect_entries(self) -> list[str] | None:
         """Valida i retorna la llista [addr, path, ...] de les files plenes, o None si hi ha error."""
         entries: list[str] = []
@@ -506,7 +539,7 @@ class MergeFlashTool(tk.Tk):
 
     def _collect_chip_entries(self, chip: str) -> list[str]:
         """Retorna [addr, path, ...] per un xip des del build dir (ignorant fitxers que falten)."""
-        env_dir   = BUILD_DIR / chip
+        env_dir   = self._build_dir / chip
         boot_app0 = _find_boot_app0()
         fs_offset = _find_fs_offset(env_dir / "partitions.bin")
 
@@ -523,6 +556,8 @@ class MergeFlashTool(tk.Tk):
                 entries.extend([addr, str(path)])
         return entries
 
+    # ── Accions ───────────────────────────────────────────────────────
+
     def _start_merge(self):
         esptool = find_esptool()
         if esptool is None:
@@ -532,8 +567,8 @@ class MergeFlashTool(tk.Tk):
             )
             return
 
-        version = _get_version()
-        rel_dir = ROOT / "release" / version
+        version = self._get_version()
+        rel_dir = self._proj_root / "release" / version
         rel_dir.mkdir(parents=True, exist_ok=True)
 
         if self._chip_var.get() == "Tots":
@@ -554,7 +589,7 @@ class MergeFlashTool(tk.Tk):
             title="Desa el binari fusionat",
             defaultextension=".bin",
             initialdir=str(rel_dir),
-            initialfile=f"{ROOT.name}_{version}_{chip}.bin",
+            initialfile=f"{self._proj_root.name}_{version}_{chip}.bin",
             filetypes=[("Fitxers binaris", "*.bin"), ("Tots els fitxers", "*.*")],
         )
         if not output:
@@ -566,13 +601,14 @@ class MergeFlashTool(tk.Tk):
         threading.Thread(target=self._run_cmd, args=(cmd,), daemon=True).start()
 
     def _merge_all_chips_thread(self, esptool: list, version: str, rel_dir: pathlib.Path):
+        root_name = self._proj_root.name
         try:
             for chip in CHIPS:
                 entries = self._collect_chip_entries(chip)
                 if not entries:
                     self._log_queue.put(f"\n⚠  {chip}: no s'han trobat fitxers de build. Saltant.\n")
                     continue
-                output = str(rel_dir / f"{ROOT.name}_{version}_{chip}.bin")
+                output = str(rel_dir / f"{root_name}_{version}_{chip}.bin")
                 self._log_queue.put(f"\n▶  Processant {chip}...\n")
                 self._run_cmd_raw([*esptool, "--chip", chip, "merge_bin", "--output", output, *entries])
                 self._log_queue.put(f"   Sortida: {output}\n")
@@ -648,8 +684,8 @@ class MergeFlashTool(tk.Tk):
 
     def _start_export_ota(self):
         if self._chip_var.get() == "Tots":
-            version = _get_version()
-            rel_dir = ROOT / "release" / version
+            version = self._get_version()
+            rel_dir = self._proj_root / "release" / version
             rel_dir.mkdir(parents=True, exist_ok=True)
             self._set_busy(True)
             threading.Thread(
@@ -672,15 +708,15 @@ class MergeFlashTool(tk.Tk):
             return
 
         chip    = self._chip_var.get()
-        version = _get_version()
-        rel_dir = ROOT / "release" / version
+        version = self._get_version()
+        rel_dir = self._proj_root / "release" / version
         rel_dir.mkdir(parents=True, exist_ok=True)
 
         output = filedialog.asksaveasfilename(
             title="Desa el binari OTA",
             defaultextension=".bin",
             initialdir=str(rel_dir),
-            initialfile=f"{ROOT.name}_{version}_{chip}_ota.bin",
+            initialfile=f"{self._proj_root.name}_{version}_{chip}_ota.bin",
             filetypes=[("Fitxers binaris", "*.bin"), ("Tots els fitxers", "*.*")],
         )
         if not output:
@@ -704,15 +740,16 @@ class MergeFlashTool(tk.Tk):
         self._log_queue.put("✓  Binari OTA generat. Puja'l via web > Configuració > Actualitzar.\n")
 
     def _export_ota_all_thread(self, version: str, rel_dir: pathlib.Path):
+        root_name = self._proj_root.name
         try:
             for chip in CHIPS:
-                env_dir  = BUILD_DIR / chip
+                env_dir  = self._build_dir / chip
                 fw_path  = env_dir / "firmware.bin"
                 lfs_path = env_dir / "littlefs.bin"
                 if not fw_path.is_file() or not lfs_path.is_file():
                     self._log_queue.put(f"\n⚠  {chip}: firmware.bin o littlefs.bin no trobats. Saltant.\n")
                     continue
-                output   = str(rel_dir / f"{ROOT.name}_{version}_{chip}_ota.bin")
+                output   = str(rel_dir / f"{root_name}_{version}_{chip}_ota.bin")
                 fw_data  = fw_path.read_bytes()
                 lfs_data = lfs_path.read_bytes()
                 with open(output, "wb") as f:
