@@ -106,6 +106,21 @@ def find_esptool() -> list[str] | None:
     return None
 
 
+def find_pio() -> list[str] | None:
+    try:
+        subprocess.run(["pio", "--version"], check=True, capture_output=True)
+        return ["pio"]
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+    pio_home = _find_pio_home()
+    if pio_home:
+        for rel in ["penv/Scripts/pio.exe", "penv/Scripts/pio", "penv/bin/pio"]:
+            c = pio_home / rel
+            if c.exists():
+                return [str(c)]
+    return None
+
+
 def list_serial_ports() -> list[str]:
     try:
         from serial.tools import list_ports
@@ -127,6 +142,35 @@ def list_serial_ports() -> list[str]:
     except Exception:
         pass
     return []
+
+
+class ToolTip:
+    """Tooltip simple que apareix sota el widget en hover."""
+
+    def __init__(self, widget: tk.Widget, text: str):
+        self._widget = widget
+        self._text   = text
+        self._tip: tk.Toplevel | None = None
+        widget.bind("<Enter>", self._show)
+        widget.bind("<Leave>", self._hide)
+
+    def _show(self, _event=None):
+        x = self._widget.winfo_rootx() + 10
+        y = self._widget.winfo_rooty() + self._widget.winfo_height() + 4
+        self._tip = tk.Toplevel(self._widget)
+        self._tip.wm_overrideredirect(True)
+        self._tip.wm_geometry(f"+{x}+{y}")
+        tk.Label(
+            self._tip, text=self._text,
+            background="#fffde7", relief="solid", borderwidth=1,
+            font=("TkDefaultFont", 9), wraplength=300, justify="left",
+            padx=7, pady=5,
+        ).pack()
+
+    def _hide(self, _event=None):
+        if self._tip:
+            self._tip.destroy()
+            self._tip = None
 
 
 class FileRow:
@@ -317,30 +361,24 @@ class MergeFlashTool(tk.Tk):
             wraplength=520, justify="left",
         ).pack(padx=6, pady=12, anchor="w")
 
-        # ── Botons FLASH / MERGE / ERASE / EXPORT OTA ─────────────────
+        # ── Botons COMPILE / ERASE / FLASH / MERGE / EXPORT OTA ─────────
         ttk.Separator(outer, orient="horizontal").pack(fill="x", pady=8)
         btn_frame = tk.Frame(outer)
         btn_frame.pack()
 
-        self._flash_btn = tk.Button(
-            btn_frame, text="  FLASH  ",
-            bg="#c0392b", fg="white",
-            activebackground="#e74c3c", activeforeground="white",
+        self._compile_btn = tk.Button(
+            btn_frame, text="  COMPILE  ",
+            bg="#6c3483", fg="white",
+            activebackground="#8e44ad", activeforeground="white",
             font=("TkDefaultFont", 11, "bold"),
             relief="flat", padx=22, pady=8, cursor="hand2",
-            command=self._start_flash,
+            command=self._start_compile,
         )
-        self._flash_btn.pack(side="left", padx=12)
-
-        self._merge_btn = tk.Button(
-            btn_frame, text="  MERGE  ",
-            bg="#1a6b8a", fg="white",
-            activebackground="#2196b8", activeforeground="white",
-            font=("TkDefaultFont", 11, "bold"),
-            relief="flat", padx=22, pady=8, cursor="hand2",
-            command=self._start_merge,
-        )
-        self._merge_btn.pack(side="left", padx=12)
+        self._compile_btn.pack(side="left", padx=12)
+        ToolTip(self._compile_btn,
+                "Compila el codi font i el sistema de fitxers (filesystem) per al xip "
+                "seleccionat (o tots) usant PlatformIO. Cal executar-ho abans de FLASH, "
+                "MERGE o EXPORT OTA si el codi ha canviat.")
 
         self._erase_btn = tk.Button(
             btn_frame, text="  ERASE  ",
@@ -351,6 +389,38 @@ class MergeFlashTool(tk.Tk):
             command=self._start_erase,
         )
         self._erase_btn.pack(side="left", padx=12)
+        ToolTip(self._erase_btn,
+                "Esborra completament la memòria flash del dispositiu connectat al port "
+                "seleccionat. Útil per restablir-lo des de zero o solucionar problemes "
+                "de corrupció.")
+
+        self._flash_btn = tk.Button(
+            btn_frame, text="  FLASH  ",
+            bg="#c0392b", fg="white",
+            activebackground="#e74c3c", activeforeground="white",
+            font=("TkDefaultFont", 11, "bold"),
+            relief="flat", padx=22, pady=8, cursor="hand2",
+            command=self._start_flash,
+        )
+        self._flash_btn.pack(side="left", padx=12)
+        ToolTip(self._flash_btn,
+                "Programa el dispositiu connectat (via port sèrie) amb els fitxers "
+                "compilats: bootloader, particions, firmware i filesystem. Requereix "
+                "cable USB.")
+
+        self._merge_btn = tk.Button(
+            btn_frame, text="  MERGE  ",
+            bg="#1a6b8a", fg="white",
+            activebackground="#2196b8", activeforeground="white",
+            font=("TkDefaultFont", 11, "bold"),
+            relief="flat", padx=22, pady=8, cursor="hand2",
+            command=self._start_merge,
+        )
+        self._merge_btn.pack(side="left", padx=12)
+        ToolTip(self._merge_btn,
+                "Unifica tots els fitxers compilats (bootloader, particions, firmware i "
+                "filesystem) en un sol .bin. Pràctic per distribuir a l'usuari final: "
+                "només cal programar un fitxer.")
 
         self._ota_btn = tk.Button(
             btn_frame, text="  EXPORT OTA  ",
@@ -361,6 +431,10 @@ class MergeFlashTool(tk.Tk):
             command=self._start_export_ota,
         )
         self._ota_btn.pack(side="left", padx=12)
+        ToolTip(self._ota_btn,
+                "Genera un paquet d'actualització OTA (.bin) amb el firmware i el "
+                "filesystem. Permet actualitzar el dispositiu via web (sense cable) "
+                "des de Configuració → Actualitzar.")
 
         # ── Consola ───────────────────────────────────────────────────
         ttk.Separator(outer, orient="horizontal").pack(fill="x", pady=(8, 4))
@@ -453,6 +527,7 @@ class MergeFlashTool(tk.Tk):
         self._ota_btn.configure(state="disabled" if busy else "normal")
         merge_disabled = busy or (not is_all and is_merged_mode)
         self._merge_btn.configure(state="disabled" if merge_disabled else "normal")
+        self._compile_btn.configure(state="disabled" if busy else "normal")
 
     def _refresh_ports(self):
         ports = list_serial_ports()
@@ -764,6 +839,54 @@ class MergeFlashTool(tk.Tk):
                 self._log_queue.put(f"  total:     {12 + len(fw_data) + len(lfs_data):,} bytes\n")
                 self._log_queue.put(f"{'─' * 64}\n")
             self._log_queue.put("✓  Export OTA completat per a tots els xips. Puja via web > Configuració > Actualitzar.\n")
+        finally:
+            self.after(0, lambda: self._set_busy(False))
+
+
+    def _start_compile(self):
+        pio = find_pio()
+        if pio is None:
+            messagebox.showerror(
+                "PlatformIO no trobat",
+                "No s'ha pogut localitzar pio.\n\nAssegura't que PlatformIO està instal·lat i al PATH.",
+            )
+            return
+        chip = self._chip_var.get()
+        self._set_busy(True)
+        if chip == "Tots":
+            threading.Thread(
+                target=self._compile_all_chips_thread,
+                args=(pio,),
+                daemon=True,
+            ).start()
+        else:
+            threading.Thread(
+                target=self._compile_chip_thread,
+                args=(pio, chip),
+                daemon=True,
+            ).start()
+
+    def _compile_chip_thread(self, pio: list, chip: str):
+        try:
+            proj = str(self._proj_root)
+            self._log_queue.put(f"\n▶  Compilant firmware [{chip}]...\n")
+            ok = self._run_cmd_raw([*pio, "run", "-e", chip, "-d", proj])
+            if ok:
+                self._log_queue.put(f"\n▶  Compilant filesystem [{chip}]...\n")
+                self._run_cmd_raw([*pio, "run", "-e", chip, "-t", "buildfs", "-d", proj])
+        finally:
+            self.after(0, lambda: self._set_busy(False))
+
+    def _compile_all_chips_thread(self, pio: list):
+        try:
+            proj = str(self._proj_root)
+            for chip in CHIPS:
+                self._log_queue.put(f"\n▶  Compilant firmware [{chip}]...\n")
+                ok = self._run_cmd_raw([*pio, "run", "-e", chip, "-d", proj])
+                if ok:
+                    self._log_queue.put(f"\n▶  Compilant filesystem [{chip}]...\n")
+                    self._run_cmd_raw([*pio, "run", "-e", chip, "-t", "buildfs", "-d", proj])
+            self._log_queue.put("\n✓  COMPILE completat per a tots els xips.\n")
         finally:
             self.after(0, lambda: self._set_busy(False))
 
