@@ -3,6 +3,7 @@
 #include <FS.h>
 #include <LittleFS.h>
 #include <esp_sleep.h>
+#include <esp_system.h>
 #include <Update.h>
 #include "ESPAsyncWebServer.h"
 #include "config.h"
@@ -105,6 +106,76 @@ void webServerSetup() {
     String json = "{\"version\":\"" + String(FIRMWARE_VERSION) + "\","
                   "\"mac\":\"" + myAddresssDoted + "\"}";
     request->send(200, "application/json", json);
+  });
+
+  server.on("/chipinfo", HTTP_GET, [](AsyncWebServerRequest *r) {
+    auto rstStr = [](esp_reset_reason_t rs) -> const char* {
+      switch (rs) {
+        case ESP_RST_POWERON:   return "power-on";
+        case ESP_RST_SW:        return "reset SW";
+        case ESP_RST_PANIC:     return "excepcio/panic";
+        case ESP_RST_INT_WDT:   return "WDT interrupcio";
+        case ESP_RST_TASK_WDT:  return "WDT tasca";
+        case ESP_RST_WDT:       return "WDT (altre)";
+        case ESP_RST_DEEPSLEEP: return "deep sleep";
+        case ESP_RST_BROWNOUT:  return "brownout";
+        default:                return "desconegut";
+      }
+    };
+    prefs.begin("blau", true);
+    String fwFile = prefs.getString("fw_file", "");
+    prefs.end();
+    uint32_t up = millis() / 1000;
+    char uptime[32];
+    snprintf(uptime, sizeof(uptime), "%lud %02lu:%02lu:%02lu",
+      (unsigned long)(up/86400), (unsigned long)((up%86400)/3600),
+      (unsigned long)((up%3600)/60), (unsigned long)(up%60));
+    String mac      = WiFi.macAddress();
+    String ip       = WiFi.softAPIP().toString();
+    String gw       = WiFi.gatewayIP().toString();
+    String mask     = WiFi.subnetMask().toString();
+    String dns1     = WiFi.dnsIP(0).toString();
+    String dns2     = WiFi.dnsIP(1).toString();
+    String ssid     = WiFi.SSID();
+    int    rssi     = WiFi.RSSI();
+    int    ch       = WiFi.channel();
+    String bssid    = WiFi.BSSIDstr();
+    String hostname = String(WiFi.getHostname());
+    String json = "{";
+    json += "\"fw_ver\":\""         + String(FIRMWARE_VERSION)                       + "\",";
+    json += "\"fw_file\":\""        + fwFile                                          + "\",";
+    json += "\"build_date\":\""     + String(__DATE__ " " __TIME__)                   + "\",";
+    json += "\"uptime\":\""         + String(uptime)                                  + "\",";
+    json += "\"restart_reason\":\"" + String(rstStr(esp_reset_reason()))              + "\",";
+    json += "\"cpu_temp\":"         + String(temperatureRead(), 1)                    + ",";
+    json += "\"chip\":\""           + String(ESP.getChipModel())                      + "\",";
+    json += "\"chip_rev\":"         + String(ESP.getChipRevision())                   + ",";
+    json += "\"cores\":"            + String(ESP.getChipCores())                      + ",";
+    json += "\"cpu_mhz\":"          + String(ESP.getCpuFreqMHz())                     + ",";
+    json += "\"idf_ver\":\""        + String(ESP.getSdkVersion())                     + "\",";
+    json += "\"heap_free\":"        + String(ESP.getFreeHeap())                       + ",";
+    json += "\"heap_total\":"       + String(ESP.getHeapSize())                       + ",";
+    json += "\"psram_size\":"       + String(ESP.getPsramSize())                      + ",";
+    json += "\"psram_free\":"       + String(ESP.getFreePsram())                      + ",";
+    json += "\"flash_size\":"       + String(ESP.getFlashChipSize())                  + ",";
+    json += "\"flash_mhz\":"        + String(ESP.getFlashChipSpeed()/1000000)         + ",";
+    json += "\"sketch_size\":"      + String(ESP.getSketchSize())                     + ",";
+    json += "\"sketch_free\":"      + String(ESP.getFreeSketchSpace())                + ",";
+    json += "\"fs_used\":"          + String(LittleFS.usedBytes())                    + ",";
+    json += "\"fs_total\":"         + String(LittleFS.totalBytes())                   + ",";
+    json += "\"wifi_hostname\":\""  + hostname                                        + "\",";
+    json += "\"wifi_ip\":\""        + ip                                              + "\",";
+    json += "\"wifi_gw\":\""        + gw                                              + "\",";
+    json += "\"wifi_mask\":\""      + mask                                            + "\",";
+    json += "\"wifi_dns1\":\""      + dns1                                            + "\",";
+    json += "\"wifi_dns2\":\""      + dns2                                            + "\",";
+    json += "\"wifi_ssid\":\""      + ssid                                            + "\",";
+    json += "\"wifi_rssi_dbm\":"    + String(rssi)                                    + ",";
+    json += "\"wifi_ch\":"          + String(ch)                                      + ",";
+    json += "\"wifi_bssid\":\""     + bssid                                           + "\",";
+    json += "\"mac\":\""            + mac                                             + "\"";
+    json += "}";
+    r->send(200, "application/json", json);
   });
 
   server.on("/1click_cmd", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -343,20 +414,28 @@ void webServerSetup() {
   });
 
   // ── OTA update ───────────────────────────────────────────────
+  static String s_pending_fw_file;
+
   server.on("/ota-upload", HTTP_POST,
     [](AsyncWebServerRequest *r) {
       bool ok = !Update.hasError();
+      if (ok && s_pending_fw_file.length() > 0) {
+        prefs.begin("blau", false);
+        prefs.putString("fw_file", s_pending_fw_file);
+        prefs.end();
+      }
       r->send(200, "application/json",
         ok ? "{\"ok\":true}"
            : String("{\"ok\":false,\"err\":\"") + Update.errorString() + "\"}");
       if (ok) { delay(200); ESP.restart(); }
     },
-    [](AsyncWebServerRequest*, const String&, size_t index,
+    [](AsyncWebServerRequest*, const String& filename, size_t index,
        uint8_t *data, size_t len, bool) {
       static uint32_t _app_sz, _lfs_sz, _written, _phase, _hdr_bytes;
       static uint8_t  _hdr[12];
 
       if (index == 0) {
+        if (filename.length() > 0) s_pending_fw_file = filename;
         _app_sz = _lfs_sz = _written = _phase = _hdr_bytes = 0;
         Update.abort();
       }

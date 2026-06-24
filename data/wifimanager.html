@@ -198,9 +198,9 @@
     <div id="page-ota" class="page">
       <button class="back-btn" onclick="showPage('page-configuracio')" data-i18n="navBack">&#8592; Enrere</button>
       <div class="card">
-        <label data-i18n="otaTitle">Actualitzar firmware</label>
-        <p id="otaVersion" style="font-size:0.85em; color:#888; margin:2px 0 12px;"></p>
-        <label for="otaFile" style="font-size:0.9em;" data-i18n="otaFileLabel">Fitxer OTA (.bin)</label>
+        <label data-i18n="otaTitle">Informació</label>
+        <div id="otaInfo" style="font-size:0.82em; margin:2px 0 14px;"></div>
+        <label for="otaFile" style="font-size:0.9em;" data-i18n="otaFileLabel">Actualitza firmware via fitxer OTA (.bin)</label>
         <input type="file" id="otaFile" accept=".bin" style="margin-bottom:10px;">
         <button class="btn" type="button" onclick="startOTA()" data-i18n="otaUploadBtn">Pujar i actualitzar</button>
         <div id="otaProgressWrap" style="display:none; margin-top:12px;">

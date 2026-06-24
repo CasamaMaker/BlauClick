@@ -112,6 +112,26 @@ GPIO 3  →  EN_BTN  (LDO enable)
 GPIO 6  →  NeoPixel / WS2812 data
 ```
 
+### 💾 Flash layout (4 MB)
+
+```
+┌─────────────────────┐ 0x000000
+│  Bootloader  ~28 kB │
+├─────────────────────┤ 0x008000
+│  Partition table 4 kB│
+├─────────────────────┤ 0x009000
+│  NVS         ~20 kB │  ← settings (WiFi, pairing, config)
+├─────────────────────┤ 0x00E000
+│  OTA data     8 kB  │  ← tracks active partition
+├─────────────────────┤ 0x010000
+│  Sketch             │
+├─────────────────────┤
+│  Filesystem         │
+└─────────────────────┘ 0x400000  (4 MB)
+```
+
+> The ~200 kB system area (bootloader + partition table + NVS + OTA metadata) is reserved — not available for code or files.
+
 ---
 
 ## 🚀 Getting Started

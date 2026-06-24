@@ -112,6 +112,26 @@ GPIO 3  →  EN_BTN  (activación LDO)
 GPIO 6  →  NeoPixel / datos WS2812
 ```
 
+### 💾 Mapa de la flash (4 MB)
+
+```
+┌─────────────────────┐ 0x000000
+│  Bootloader  ~28 kB │
+├─────────────────────┤ 0x008000
+│  Tabla particiones 4 kB│
+├─────────────────────┤ 0x009000
+│  NVS         ~20 kB │  ← configuración (WiFi, emparejamiento, config)
+├─────────────────────┤ 0x00E000
+│  OTA data     8 kB  │  ← registra la partición activa
+├─────────────────────┤ 0x010000
+│  Sketch             │
+├─────────────────────┤
+│  Filesystem         │
+└─────────────────────┘ 0x400000  (4 MB)
+```
+
+> La zona del sistema (~200 kB) — bootloader + tabla de particiones + NVS + metadatos OTA — está reservada y no puede usarse para código ni archivos.
+
 ---
 
 ## 🚀 Primeros pasos

@@ -1,3 +1,13 @@
+    function apiGetChipInfo(cb) {
+      var x = new XMLHttpRequest();
+      x.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+          try { cb(JSON.parse(this.responseText)); } catch(e) {}
+        }
+      };
+      x.open("GET", "/chipinfo", true); x.send();
+    }
+
     function apiGetHwGpioMap(cb) {
       var x = new XMLHttpRequest();
       x.onreadystatechange = function() {

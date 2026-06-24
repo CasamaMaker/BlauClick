@@ -395,10 +395,65 @@
 
     // ── OTA ──────────────────────────────────────────────────────────
 
+    function _buildChipInfoHtml(info) {
+      function fmtB(n) { return n >= 1048576 ? (n/1048576).toFixed(1)+' MB' : Math.round(n/1024)+' kB'; }
+      function pct(dbm) { return Math.min(100, Math.max(0, 2*(dbm+100))); }
+      var net = info.wifi_ip && info.wifi_ip !== '0.0.0.0';
+      var sections = [
+        { h: t('otaSecSW'), rows: [
+          [t('otaFwVer'),    info.fw_ver    || '—'],
+          [t('otaFwFile'),   info.fw_file   || '—'],
+          [t('otaBuildDate'),info.build_date|| '—'],
+        ]},
+        { h: t('otaSecSys'), rows: [
+          [t('otaUptime'),  info.uptime         || '—'],
+          [t('otaRestart'), info.restart_reason || '—'],
+          [t('otaCpuTemp'), info.cpu_temp !== undefined ? parseFloat(info.cpu_temp).toFixed(1)+' °C' : '—'],
+        ]},
+        { h: t('otaSecChip'), rows: [
+          ['Xip',         (info.chip||'—')+' rev.'+(info.chip_rev||0)],
+          [t('otaCores'), (info.cores||0)+' × '+(info.cpu_mhz||0)+' MHz'],
+          ['IDF',         info.idf_ver||'—'],
+        ]},
+      ];
+      var mem = [
+        [t('otaHeap'), fmtB(info.heap_free)+' lliure / '+fmtB(info.heap_total)],
+      ];
+      if ((info.psram_size||0) > 0) mem.push(['PSRAM', fmtB(info.psram_free)+' lliure / '+fmtB(info.psram_size)]);
+      mem.push(['Flash',         fmtB(info.flash_size)+' @ '+info.flash_mhz+' MHz']);
+      mem.push([t('otaSketch'),  fmtB(info.sketch_size)+' / '+fmtB(info.sketch_size+info.sketch_free)]);
+      mem.push([t('otaFilesys'), fmtB(info.fs_used)+' / '+fmtB(info.fs_total)]);
+      sections.push({ h: t('otaSecMem'), rows: mem });
+      var netRows = [];
+      if (info.wifi_hostname) netRows.push(['Hostname', info.wifi_hostname]);
+      if (net) {
+        netRows.push(['IP',      info.wifi_ip]);
+        netRows.push(['Gateway', info.wifi_gw]);
+        netRows.push(['Subnet',  info.wifi_mask]);
+        if (info.wifi_dns1 && info.wifi_dns1 !== '0.0.0.0') netRows.push(['DNS 1', info.wifi_dns1]);
+        if (info.wifi_dns2 && info.wifi_dns2 !== '0.0.0.0') netRows.push(['DNS 2', info.wifi_dns2]);
+        netRows.push(['SSID',   info.wifi_ssid]);
+        netRows.push([t('otaRSSI'), pct(info.wifi_rssi_dbm)+'%, '+info.wifi_rssi_dbm+' dBm']);
+        netRows.push(['Canal',  info.wifi_ch]);
+        netRows.push(['BSSID',  info.wifi_bssid]);
+      }
+      netRows.push(['MAC', info.mac]);
+      sections.push({ h: t('otaSecNet'), rows: netRows });
+      var h = '<table style="border-collapse:collapse;width:100%;">';
+      sections.forEach(function(s) {
+        h += '<tr><td colspan="2" style="padding:6px 0 2px;font-weight:600;color:#1a73e8;font-size:0.88em;border-bottom:1px solid #e0e0e0;">'+s.h+'</td></tr>';
+        s.rows.forEach(function(r) {
+          h += '<tr><td style="padding:1px 10px 1px 0;color:#888;white-space:nowrap;">'+r[0]+'</td><td style="padding:1px 0;font-weight:500;color:#333;">'+r[1]+'</td></tr>';
+        });
+      });
+      return h + '</table>';
+    }
+
     function fetchOtaVersion() {
-      apiGetInfo(function(info) {
-        var el = document.getElementById('otaVersion');
-        if (el && info.version) el.textContent = t('otaCurrentVer') + info.version;
+      var el = document.getElementById('otaInfo');
+      if (!el) return;
+      apiGetChipInfo(function(info) {
+        el.innerHTML = _buildChipInfoHtml(info);
       });
     }
 
