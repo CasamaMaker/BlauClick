@@ -224,8 +224,10 @@ class FileRow:
 class MergeFlashTool(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.resizable(True, False)
+        self.resizable(True, True)
         self._log_queue: queue.Queue[str] = queue.Queue()
+        self._monitor_ser = None
+        self._monitor_running = False
         self._project_var = tk.StringVar(value=_DEFAULT_PROJECT)
         self._proj_root = PROJECTS[_DEFAULT_PROJECT]
         self._build_dir = self._resolve_build_dir()
@@ -272,11 +274,17 @@ class MergeFlashTool(tk.Tk):
         ttk.Separator(top, orient="vertical").pack(side="left", fill="y", padx=(6, 12))
 
         tk.Label(top, text="Chip:", anchor="w").pack(side="left", padx=(0, 4))
-        self._chip_var = tk.StringVar(value=CHIPS[0])
+        self._chip_var = tk.StringVar(value="")
         chip_cb = ttk.Combobox(top, textvariable=self._chip_var,
                                values=[*CHIPS, "Tots"], state="readonly", width=12)
         chip_cb.pack(side="left", padx=(0, 20))
         chip_cb.bind("<<ComboboxSelected>>", lambda _: self._on_chip_changed())
+
+        self._detect_btn = tk.Button(top, text="Autodetectar", command=self._autodetect_chip)
+        self._detect_btn.pack(side="left", padx=(0, 20))
+        ToolTip(self._detect_btn,
+                "Consulta el dispositiu connectat (via port sèrie) per detectar automàticament "
+                "quin xip ESP32 és.")
 
         tk.Label(top, text="Port:", anchor="w").pack(side="left", padx=(0, 4))
         self._port_var = tk.StringVar()
@@ -361,20 +369,43 @@ class MergeFlashTool(tk.Tk):
             wraplength=520, justify="left",
         ).pack(padx=6, pady=12, anchor="w")
 
+        # ── Vista: cap xip seleccionat ─────────────────────────────────
+        self._blank_frame = tk.Frame(self._selection_area)
+        tk.Label(
+            self._blank_frame,
+            text="Selecciona un xip (o autodetecta'l) per continuar.",
+            fg="#666666", font=("TkDefaultFont", 9, "italic"),
+            wraplength=520, justify="left",
+        ).pack(padx=6, pady=12, anchor="w")
+
         # ── Botons COMPILE / ERASE / FLASH / MERGE / EXPORT OTA ─────────
         ttk.Separator(outer, orient="horizontal").pack(fill="x", pady=8)
         btn_frame = tk.Frame(outer)
         btn_frame.pack()
 
+        self._read_btn = tk.Button(
+            btn_frame, text="  LLEGIR  ",
+            bg="#b9770e", fg="white",
+            activebackground="#d68910", activeforeground="white",
+            font=("TkDefaultFont", 9, "bold"),
+            relief="flat", padx=12, pady=5, cursor="hand2",
+            command=self._start_read,
+        )
+        self._read_btn.pack(side="left", padx=6)
+        ToolTip(self._read_btn,
+                "Llegeix tota la memòria flash del dispositiu connectat i la desa en un "
+                ".bin de còpia de seguretat. Fes-ho abans de FLASH si vols poder recuperar "
+                "el firmware original.")
+
         self._compile_btn = tk.Button(
             btn_frame, text="  COMPILE  ",
             bg="#6c3483", fg="white",
             activebackground="#8e44ad", activeforeground="white",
-            font=("TkDefaultFont", 11, "bold"),
-            relief="flat", padx=22, pady=8, cursor="hand2",
+            font=("TkDefaultFont", 9, "bold"),
+            relief="flat", padx=12, pady=5, cursor="hand2",
             command=self._start_compile,
         )
-        self._compile_btn.pack(side="left", padx=12)
+        self._compile_btn.pack(side="left", padx=6)
         ToolTip(self._compile_btn,
                 "Compila el codi font i el sistema de fitxers (filesystem) per al xip "
                 "seleccionat (o tots) usant PlatformIO. Cal executar-ho abans de FLASH, "
@@ -384,11 +415,11 @@ class MergeFlashTool(tk.Tk):
             btn_frame, text="  ERASE  ",
             bg="#5d6d7e", fg="white",
             activebackground="#7f8c8d", activeforeground="white",
-            font=("TkDefaultFont", 11, "bold"),
-            relief="flat", padx=22, pady=8, cursor="hand2",
+            font=("TkDefaultFont", 9, "bold"),
+            relief="flat", padx=12, pady=5, cursor="hand2",
             command=self._start_erase,
         )
-        self._erase_btn.pack(side="left", padx=12)
+        self._erase_btn.pack(side="left", padx=6)
         ToolTip(self._erase_btn,
                 "Esborra completament la memòria flash del dispositiu connectat al port "
                 "seleccionat. Útil per restablir-lo des de zero o solucionar problemes "
@@ -398,11 +429,11 @@ class MergeFlashTool(tk.Tk):
             btn_frame, text="  FLASH  ",
             bg="#c0392b", fg="white",
             activebackground="#e74c3c", activeforeground="white",
-            font=("TkDefaultFont", 11, "bold"),
-            relief="flat", padx=22, pady=8, cursor="hand2",
+            font=("TkDefaultFont", 9, "bold"),
+            relief="flat", padx=12, pady=5, cursor="hand2",
             command=self._start_flash,
         )
-        self._flash_btn.pack(side="left", padx=12)
+        self._flash_btn.pack(side="left", padx=6)
         ToolTip(self._flash_btn,
                 "Programa el dispositiu connectat (via port sèrie) amb els fitxers "
                 "compilats: bootloader, particions, firmware i filesystem. Requereix "
@@ -412,11 +443,11 @@ class MergeFlashTool(tk.Tk):
             btn_frame, text="  MERGE  ",
             bg="#1a6b8a", fg="white",
             activebackground="#2196b8", activeforeground="white",
-            font=("TkDefaultFont", 11, "bold"),
-            relief="flat", padx=22, pady=8, cursor="hand2",
+            font=("TkDefaultFont", 9, "bold"),
+            relief="flat", padx=12, pady=5, cursor="hand2",
             command=self._start_merge,
         )
-        self._merge_btn.pack(side="left", padx=12)
+        self._merge_btn.pack(side="left", padx=6)
         ToolTip(self._merge_btn,
                 "Unifica tots els fitxers compilats (bootloader, particions, firmware i "
                 "filesystem) en un sol .bin. Pràctic per distribuir a l'usuari final: "
@@ -426,15 +457,29 @@ class MergeFlashTool(tk.Tk):
             btn_frame, text="  EXPORT OTA  ",
             bg="#27ae60", fg="white",
             activebackground="#2ecc71", activeforeground="white",
-            font=("TkDefaultFont", 11, "bold"),
-            relief="flat", padx=22, pady=8, cursor="hand2",
+            font=("TkDefaultFont", 9, "bold"),
+            relief="flat", padx=12, pady=5, cursor="hand2",
             command=self._start_export_ota,
         )
-        self._ota_btn.pack(side="left", padx=12)
+        self._ota_btn.pack(side="left", padx=6)
         ToolTip(self._ota_btn,
                 "Genera un paquet d'actualització OTA (.bin) amb el firmware i el "
                 "filesystem. Permet actualitzar el dispositiu via web (sense cable) "
                 "des de Configuració → Actualitzar.")
+
+        self._monitor_btn = tk.Button(
+            btn_frame, text="  TERMINAL  ",
+            bg="#34495e", fg="white",
+            activebackground="#4a6278", activeforeground="white",
+            font=("TkDefaultFont", 9, "bold"),
+            relief="flat", padx=12, pady=5, cursor="hand2",
+            command=self._toggle_monitor,
+        )
+        self._monitor_btn.pack(side="left", padx=6)
+        ToolTip(self._monitor_btn,
+                "Mostra pel terminal (consola de sota) el que reporta el microcontrolador "
+                "pel port seleccionat. S'activa automàticament en acabar de fer FLASH. "
+                "Torna a prémer per aturar-lo.")
 
         # ── Consola ───────────────────────────────────────────────────
         ttk.Separator(outer, orient="horizontal").pack(fill="x", pady=(8, 4))
@@ -464,7 +509,7 @@ class MergeFlashTool(tk.Tk):
         self._on_chip_changed()
 
     def _on_mode_changed(self):
-        if self._chip_var.get() == "Tots":
+        if self._chip_var.get() in ("", "Tots"):
             return
         if self._mode_var.get() == "components":
             self._merged_frame.pack_forget()
@@ -485,13 +530,23 @@ class MergeFlashTool(tk.Tk):
     def _on_chip_changed(self):
         chip = self._chip_var.get()
 
+        if chip == "":
+            self._components_frame.pack_forget()
+            self._merged_frame.pack_forget()
+            self._tots_frame.pack_forget()
+            self._blank_frame.pack(fill="x")
+            self._update_button_states()
+            return
+
         if chip == "Tots":
             self._components_frame.pack_forget()
             self._merged_frame.pack_forget()
+            self._blank_frame.pack_forget()
             self._tots_frame.pack(fill="x")
             self._update_button_states()
             return
 
+        self._blank_frame.pack_forget()
         self._tots_frame.pack_forget()
         if self._mode_var.get() == "components":
             self._merged_frame.pack_forget()
@@ -519,15 +574,20 @@ class MergeFlashTool(tk.Tk):
         self._update_button_states()
 
     def _update_button_states(self, busy: bool = False):
-        is_all         = self._chip_var.get() == "Tots"
+        chip           = self._chip_var.get()
+        is_all         = chip == "Tots"
+        is_blank       = chip == ""
         is_merged_mode = self._mode_var.get() == "merged"
 
-        self._flash_btn.configure(state="disabled" if (busy or is_all) else "normal")
-        self._erase_btn.configure(state="disabled" if (busy or is_all) else "normal")
-        self._ota_btn.configure(state="disabled" if busy else "normal")
-        merge_disabled = busy or (not is_all and is_merged_mode)
+        self._flash_btn.configure(state="disabled" if (busy or is_all or is_blank) else "normal")
+        self._erase_btn.configure(state="disabled" if (busy or is_all or is_blank) else "normal")
+        self._read_btn.configure(state="disabled" if (busy or is_all or is_blank) else "normal")
+        self._ota_btn.configure(state="disabled" if (busy or is_blank) else "normal")
+        merge_disabled = busy or is_blank or (not is_all and is_merged_mode)
         self._merge_btn.configure(state="disabled" if merge_disabled else "normal")
-        self._compile_btn.configure(state="disabled" if busy else "normal")
+        self._compile_btn.configure(state="disabled" if (busy or is_blank) else "normal")
+        self._detect_btn.configure(state="disabled" if busy else "normal")
+        self._monitor_btn.configure(state="disabled" if busy else "normal")
 
     def _refresh_ports(self):
         ports = list_serial_ports()
@@ -587,11 +647,66 @@ class MergeFlashTool(tk.Tk):
             self._log_queue.put(f"\n✗  Excepció: {exc}\n")
             return False
 
-    def _run_cmd(self, cmd: list):
+    def _run_cmd(self, cmd: list, on_success=None):
         try:
-            self._run_cmd_raw(cmd)
+            ok = self._run_cmd_raw(cmd)
         finally:
             self.after(0, lambda: self._set_busy(False))
+        if ok and on_success:
+            self.after(0, on_success)
+
+    def _toggle_monitor(self):
+        if self._monitor_running:
+            self._stop_monitor()
+        else:
+            self._start_monitor()
+
+    def _start_monitor(self):
+        if self._monitor_running:
+            return
+        port = self._port_var.get().strip()
+        if not port:
+            messagebox.showerror("Error", "Selecciona o escriu un port sèrie.")
+            return
+        try:
+            import serial
+        except ImportError:
+            messagebox.showerror("pyserial no trobat", "Instal·la'l amb:\n  pip install pyserial")
+            return
+        try:
+            self._monitor_ser = serial.Serial(port, 115200, timeout=0.2)
+        except Exception as exc:
+            messagebox.showerror("Error de connexió", f"No s'ha pogut obrir {port}:\n{exc}")
+            return
+        self._monitor_running = True
+        self._monitor_btn.configure(text="  ATURAR TERMINAL  ", bg="#922b21")
+        self._log_queue.put(f"\n{'─' * 64}\n")
+        self._log_queue.put(f"▶  Terminal sèrie connectat a {port} (115200 baud)\n")
+        self._log_queue.put(f"{'─' * 64}\n\n")
+        threading.Thread(target=self._monitor_read_loop, daemon=True).start()
+
+    def _stop_monitor(self):
+        if not self._monitor_running:
+            return
+        self._monitor_running = False
+        if self._monitor_ser is not None:
+            try:
+                self._monitor_ser.close()
+            except Exception:
+                pass
+            self._monitor_ser = None
+        self._monitor_btn.configure(text="  TERMINAL  ", bg="#34495e")
+        self._log_queue.put("\n■  Terminal sèrie desconnectat.\n")
+
+    def _monitor_read_loop(self):
+        ser = self._monitor_ser
+        while self._monitor_running and ser is not None:
+            try:
+                data = ser.readline()
+            except Exception:
+                break
+            if data:
+                self._log_queue.put(data.decode("utf-8", errors="replace"))
 
     # ── Recollida entrades ────────────────────────────────────────────
 
@@ -692,6 +807,7 @@ class MergeFlashTool(tk.Tk):
             self.after(0, lambda: self._set_busy(False))
 
     def _start_flash(self):
+        self._stop_monitor()
         esptool = find_esptool()
         if esptool is None:
             messagebox.showerror(
@@ -730,9 +846,112 @@ class MergeFlashTool(tk.Tk):
             *entries,
         ]
         self._set_busy(True)
+        threading.Thread(target=self._run_cmd, args=(cmd, self._start_monitor), daemon=True).start()
+
+    _CHIP_PATTERNS = [
+        ("esp32c3", r"ESP32-C3"),
+        ("esp32c6", r"ESP32-C6"),
+        ("esp32s3", r"ESP32-S3"),
+        ("esp32s2", r"ESP32-S2"),
+        ("esp32",   r"ESP32(?!-)"),
+    ]
+
+    def _autodetect_chip(self):
+        self._stop_monitor()
+        esptool = find_esptool()
+        if esptool is None:
+            messagebox.showerror(
+                "esptool no trobat",
+                "No s'ha pogut localitzar esptool.\n\nInstal·la'l amb:\n  pip install esptool",
+            )
+            return
+        port = self._port_var.get().strip()
+        if not port:
+            messagebox.showerror("Error", "Selecciona o escriu un port sèrie.")
+            return
+
+        self._set_busy(True)
+        threading.Thread(target=self._detect_chip_thread, args=(esptool, port), daemon=True).start()
+
+    def _detect_chip_thread(self, esptool: list, port: str):
+        try:
+            self._log_queue.put(f"\n▶  Detectant xip a {port}...\n")
+            try:
+                proc = subprocess.run(
+                    [*esptool, "--port", port, "chip_id"],
+                    capture_output=True, text=True, timeout=15,
+                )
+                output = proc.stdout + proc.stderr
+            except Exception as exc:
+                self._log_queue.put(f"✗  Error: {exc}\n")
+                return
+            self._log_queue.put(output)
+
+            detected = None
+            for chip, pattern in self._CHIP_PATTERNS:
+                if re.search(pattern, output, re.IGNORECASE):
+                    detected = chip
+                    break
+
+            if detected is None:
+                self._log_queue.put("✗  No s'ha pogut detectar el xip.\n")
+                self.after(0, lambda: messagebox.showerror(
+                    "Detecció fallida", "No s'ha pogut detectar el xip connectat."))
+                return
+
+            self._log_queue.put(f"✓  Xip detectat: {detected}\n")
+            self.after(0, lambda: self._apply_detected_chip(detected))
+        finally:
+            self.after(0, lambda: self._set_busy(False))
+
+    def _apply_detected_chip(self, chip: str):
+        self._chip_var.set(chip)
+        self._on_chip_changed()
+
+    def _start_read(self):
+        self._stop_monitor()
+        esptool = find_esptool()
+        if esptool is None:
+            messagebox.showerror(
+                "esptool no trobat",
+                "No s'ha pogut localitzar esptool.\n\nInstal·la'l amb:\n  pip install esptool",
+            )
+            return
+        port = self._port_var.get().strip()
+        if not port:
+            messagebox.showerror("Error", "Selecciona o escriu un port sèrie.")
+            return
+
+        version = self._get_version()
+        chip    = self._chip_var.get()
+        rel_dir = self._proj_root / "release" / version
+        rel_dir.mkdir(parents=True, exist_ok=True)
+
+        output = filedialog.asksaveasfilename(
+            title="Desa la còpia de seguretat de la flash",
+            defaultextension=".bin",
+            initialdir=str(rel_dir),
+            initialfile=f"{chip}_backup.bin",
+            filetypes=[("Fitxers binaris", "*.bin"), ("Tots els fitxers", "*.*")],
+        )
+        if not output:
+            return
+
+        cmd = [
+            *esptool,
+            "--chip",  chip,
+            "--port",  port,
+            "--baud",  "460800",
+            "read_flash",
+            "0x0", "ALL",
+            output,
+        ]
+        self._set_busy(True)
+        self._log_queue.put(f"\nSortida: {output}\n")
         threading.Thread(target=self._run_cmd, args=(cmd,), daemon=True).start()
 
     def _start_erase(self):
+        self._stop_monitor()
         esptool = find_esptool()
         if esptool is None:
             messagebox.showerror("esptool no trobat", "No s'ha pogut localitzar esptool.")
