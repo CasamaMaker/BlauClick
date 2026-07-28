@@ -202,7 +202,7 @@ void setup() {
     if (ch == 0) {
       strip.setPixelColor(0, COLOR_SCAN);
       strip.show();
-      ch = findBlauTriggerChannel();
+      ch = findReceiverChannel();
       setCachedChannel(ch);
     } else {
       Serial.printf("[ESPNOW] Usant canal en caché: %d\n", ch);
@@ -212,8 +212,10 @@ void setup() {
     if (!ok) {
       strip.setPixelColor(0, COLOR_SCAN);
       strip.show();
-      uint8_t newCh = findBlauTriggerChannel();
+      uint8_t newCh = findReceiverChannel();
       setCachedChannel(newCh);
+      config_ESPNOW(newCh);
+      ok = send_ESPNOW();
     }
   } else {
     Serial.println("[BOOT] Cap MAC guardada, entrant al mode AP");

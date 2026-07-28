@@ -42,12 +42,11 @@ void OnDataRecv(const esp_now_recv_info_t *recv_info, const uint8_t *data, int l
   blau_on_data_recv(recv_info->src_addr, data, len, &blau_ack_received, &blau_ack_seq, &blau_ack_result);
 }
 
-uint8_t findBlauTriggerChannel() {
+uint8_t findReceiverChannel() {
   Serial.println("[ESPNOW] Escanejant canal...");
-  if (receiverSSID.length() > 0)
-    Serial.printf("[ESPNOW] Cercant SSID configurat: '%s'\n", receiverSSID.c_str());
-  else
-    Serial.println("[ESPNOW] Cercant prefix 'BlauTrigger' (cap SSID configurat)");
+  Serial.printf("[ESPNOW] Cercant MAC receptor: %02X:%02X:%02X:%02X:%02X:%02X\n",
+                receiverMac[0], receiverMac[1], receiverMac[2],
+                receiverMac[3], receiverMac[4], receiverMac[5]);
 
   WiFi.mode(WIFI_STA);
   int n = WiFi.scanNetworks(false, false, false, 500);
@@ -55,24 +54,19 @@ uint8_t findBlauTriggerChannel() {
 
   uint8_t ch = 0;
   for (int i = 0; i < n; i++) {
-    String ssid = WiFi.SSID(i);
     uint8_t netCh = (uint8_t)WiFi.channel(i);
-    Serial.printf("[ESPNOW]  [%d] '%s' ch=%d MAC=%s\n", i, ssid.c_str(), netCh, WiFi.BSSIDstr(i).c_str());
+    Serial.printf("[ESPNOW]  [%d] '%s' ch=%d MAC=%s\n", i, WiFi.SSID(i).c_str(), netCh, WiFi.BSSIDstr(i).c_str());
 
-    bool match = (receiverSSID.length() > 0)
-      ? (ssid == receiverSSID)
-      : ssid.startsWith("BlauTrigger");
-
-    if (match && ch == 0) {
+    if (ch == 0 && memcmp(WiFi.BSSID(i), receiverMac, 6) == 0) {
       ch = netCh;
-      Serial.printf("[ESPNOW] >>> Coincidencia: '%s' al canal %d\n", ssid.c_str(), ch);
+      Serial.printf("[ESPNOW] >>> Coincidencia per MAC al canal %d\n", ch);
     }
   }
   WiFi.scanDelete();
 
   if (ch == 0) {
     ch = 1;
-    Serial.printf("[ESPNOW] WARN: SSID no trobat, canal per defecte: %d\n", ch);
+    Serial.printf("[ESPNOW] WARN: MAC receptor no trobada, canal per defecte: %d\n", ch);
   }
   return ch;
 }
@@ -81,6 +75,7 @@ void config_ESPNOW(uint8_t channel) {
   WiFi.mode(WIFI_STA);
   Serial.printf("[ESPNOW] Configurant al canal %d\n", channel);
   esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
+  delay(20);  // assentament del radio abans del primer enviament
 
   if (esp_now_init() != ESP_OK) {
     Serial.println("[ESPNOW] Error initializing");
